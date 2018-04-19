@@ -1,27 +1,48 @@
 ﻿using System;
+using System.IO;
+using System.Linq;
 using System.Diagnostics;
+using Newtonsoft.Json;
+
 namespace dropdownloadcore
 {
     class Program
     {
         static void Main(string[] args)
         {
-            var url = System.Environment.GetEnvironmentVariable("vstsdropurl");
+            
             var relativepath = System.Environment.GetEnvironmentVariable("relativepath");
             var pat = System.Environment.GetEnvironmentVariable("vstspat");
             var destination = "/drop";
-            
+            var url = ExtractDropUrl(destination);
+
             // https://msasg.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/Aether_master/7dd31c59986465bfa9af3bd883cb35ce132979a2/e90d7f94-265a-86c7-5958-66983fdcaa06
             Console.WriteLine($"url:{url}");
             // /Release/Amd64/app/aether/AetherBackend
             Console.WriteLine($"relativepath:{relativepath}");
-            Console.WriteLine($"pat:{pat}");
+            //not good security practice to write out your PAT
+            //Console.WriteLine($"pat:{pat}");
             Console.WriteLine($"dest:{destination}");
             var sw = Stopwatch.StartNew();
             //should be evironment variable SYSTEM_ACCESSTOKEN
             var proxy = new VSTSDropProxy(url, relativepath, pat);
             proxy.Materialize(destination).Wait();
             Console.WriteLine($"Finished in {sw.Elapsed} ");
+        }
+
+        //agent based tasks automatically download artifacts from the build. 
+        //when the build only produces a vsts drop that artifact is a single json
+        //it resides in <builddefname>/<guid>/VSTSDrop.json
+        private static string ExtractDropUrl(string workingdir)
+        {
+            //could take an envdir on what the build dir is for now though we just have one build
+            var builddir = Directory.GetDirectories(workingdir).Single();
+            var guiddir = Directory.GetDirectories(builddir).Single();
+            var json = Path.Combine(workingdir, builddir,  guiddir, "VSTSDrop.json");
+            // https://www.newtonsoft.com/json/help/html/DeserializeAnonymousType.htm
+            var definition = new { VstsDropBuildArtifact = new {VstsDropUrl ="" } };
+            var artifact = JsonConvert.DeserializeAnonymousType(File.ReadAllText(json), definition);
+            return artifact.VstsDropBuildArtifact.VstsDropUrl;            
         }
     }
 }

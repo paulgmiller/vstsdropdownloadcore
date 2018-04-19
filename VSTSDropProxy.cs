@@ -222,10 +222,22 @@ namespace dropdownloadcore
 
         private HttpClient _contentClient = new HttpClient();
 
-        private Task<Stream> GetStream(string sasurl)
+        private async Task Download(string sasurl, string localpath)
         {
-        
-            return _contentClient.GetStreamAsync(sasurl);
+            await Policy
+                .Handle<HttpRequestException>()
+                .WaitAndRetry(5, 
+                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    (e,t) => Console.WriteLine($"Exception {e} on {sasurl} -> {localpath}")
+                    )
+                .Execute(async () =>
+                {
+                    using (var blob = await _contentClient.GetStreamAsync(sasurl))
+                    using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
+                    {
+                        await blob.CopyToAsync(fileStream);
+                    }
+                });
         }
         
         //this is still gross lose caching both witin and outside of builds
@@ -241,30 +253,16 @@ namespace dropdownloadcore
                 Directory.CreateDirectory(Path.GetDirectoryName(localpath));
             }
 
-
             int downloaded = 0;
             var downloads = _blobs.Select(async file => 
             {
-                
                 if (!file.Value.Any()) throw new ArgumentException($"empty : {file.Key}");
                 
                 var firstpath = file.Value.First();
                 var localFileName = firstpath.Substring(_relativeroot.Length);
                 var localpath = Path.Combine(localDestiantion,localFileName).Replace("\\","/");
-                await Policy
-                .Handle<HttpRequestException>()
-                .WaitAndRetry(5, 
-                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    (e,t) => Console.WriteLine($"Exception {e} on {file.Key}")
-                    )
-                .Execute(async () =>
-                {
-                    using (var blob = await GetStream(file.Key))
-                    using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
-                    {
-                        await blob.CopyToAsync(fileStream);
-                    }
-                });
+                await Download(file.Key, localpath);
+                 
                 //parallize this too? worth it?
                 foreach (var other in file.Value.Skip(1))
                 {
