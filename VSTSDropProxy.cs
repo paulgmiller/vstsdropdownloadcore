@@ -14,6 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
+using Polly;
 
 namespace dropdownloadcore
 {
@@ -244,32 +245,38 @@ namespace dropdownloadcore
             int downloaded = 0;
             var downloads = _blobs.Select(async file => 
             {
-                using (var blob = await GetStream(file.Key))
+                
+                if (!file.Value.Any()) throw new ArgumentException($"empty : {file.Key}");
+                
+                var firstpath = file.Value.First();
+                var localFileName = firstpath.Substring(_relativeroot.Length);
+                var localpath = Path.Combine(localDestiantion,localFileName).Replace("\\","/");
+                await Policy
+                .Handle<HttpRequestException>()
+                .WaitAndRetry(5, 
+                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    (e,t) => Console.WriteLine($"Exception {e} on {file.Key}")
+                    )
+                .Execute(async () =>
                 {
-                    if (!file.Value.Any())
-                    {
-                        throw new ArgumentException($"empty : {file.Key}");
-                    }
-                    var firstpath = file.Value.First();
-                    var localFileName = firstpath.Substring(_relativeroot.Length);
-                    var localpath = Path.Combine(localDestiantion,localFileName).Replace("\\","/");
+                    using (var blob = await GetStream(file.Key))
                     using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
                     {
                         await blob.CopyToAsync(fileStream);
                     }
-                  
-                    //parallize this too? worth it?
-                    foreach (var other in file.Value.Skip(1))
-                    {
-                        var otherFileName = other.Substring(_relativeroot.Length);
-                        var otherpath = Path.Combine(localDestiantion,otherFileName).Replace("\\","/");
-                        File.Copy(localpath, otherpath);
-                    }
-                    if (++downloaded % 100 == 0)
-                    {
-                        Console.WriteLine($"Downloaded {downloaded} files");
-                    }
+                });
+                //parallize this too? worth it?
+                foreach (var other in file.Value.Skip(1))
+                {
+                    var otherFileName = other.Substring(_relativeroot.Length);
+                    var otherpath = Path.Combine(localDestiantion,otherFileName).Replace("\\","/");
+                    File.Copy(localpath, otherpath);
                 }
+                if (++downloaded % 100 == 0)
+                {
+                    Console.WriteLine($"Downloaded {downloaded} files");
+                }
+                
             });
             await Task.WhenAll(downloads);
         } 
