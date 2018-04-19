@@ -235,7 +235,7 @@ namespace dropdownloadcore
             foreach (var file in _pathToUrl) //could do blobs.selectmany(vallues)
             {
                 var localFileName = file.Key.Substring(_relativeroot.Length);
-                var localpath = Path.Combine(localDestiantion,localFileName).Replace("/","\\");
+                var localpath = Path.Combine(localDestiantion,localFileName).Replace("\\","/");
                 //also not efficient to check directory each time but again this method is a hack.
                 Directory.CreateDirectory(Path.GetDirectoryName(localpath));
             }
@@ -252,7 +252,7 @@ namespace dropdownloadcore
                     }
                     var firstpath = file.Value.First();
                     var localFileName = firstpath.Substring(_relativeroot.Length);
-                    var localpath = Path.Combine(localDestiantion,localFileName).Replace("/","\\");
+                    var localpath = Path.Combine(localDestiantion,localFileName).Replace("\\","/");
                     using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
                     {
                         await blob.CopyToAsync(fileStream);
@@ -262,7 +262,7 @@ namespace dropdownloadcore
                     foreach (var other in file.Value.Skip(1))
                     {
                         var otherFileName = other.Substring(_relativeroot.Length);
-                        var otherpath = Path.Combine(localDestiantion,otherFileName).Replace("/","\\");
+                        var otherpath = Path.Combine(localDestiantion,otherFileName).Replace("\\","/");
                         File.Copy(localpath, otherpath);
                     }
                     if (++downloaded % 100 == 0)
