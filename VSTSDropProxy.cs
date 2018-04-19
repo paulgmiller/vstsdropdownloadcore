@@ -225,7 +225,11 @@ namespace dropdownloadcore
         private async Task Download(string sasurl, string localpath)
         {
             await Policy
-                .Handle<HttpRequestException>()
+                //don't catching exception but 
+                //System.AggregateException  ---> System.Net.Http.HttpRequestException ---> System.Net.Http.CurlException: Couldn't resolve host name
+                //got past handle<HttpRequestException> so not sure the right thing to handle. (curlexception seeems bad.)
+
+                .Handle<Exception>()
                 .WaitAndRetry(5, 
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                     (e,t) => Console.WriteLine($"Exception {e} on {sasurl} -> {localpath}")
