@@ -266,7 +266,13 @@ namespace dropdownloadcore
                 var localFileName = firstpath.Substring(_relativeroot.Length);
                 var localpath = Path.Combine(localDestiantion,localFileName).Replace("\\","/");
                 await Download(file.Key, localpath);
-                 
+                
+                if (file.Value.Any(n => n.EndsWith(".sh", StringComparison.OrdinalIgnoreCase)))
+                {
+                    //hope you don't want to verify hash after this. 
+                    ConvertToLf(localpath);
+                }
+
                 //parallize this too? worth it?
                 foreach (var other in file.Value.Skip(1))
                 {
@@ -282,10 +288,14 @@ namespace dropdownloadcore
             });
             await Task.WhenAll(downloads);
         } 
-        
-
-   
+        private void ConvertToLf(string localpath)
+        {
+            var mutated = File.ReadAllText(localpath)
+                            .Replace("\r\n","\n");
+            File.WriteAllText(localpath, mutated);
+        }
     }
+
 
     // Helper classes for parsing VSTS drop exe output lowercase to match json output
     public class VstsFile
