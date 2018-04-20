@@ -230,11 +230,11 @@ namespace dropdownloadcore
                 //got past handle<HttpRequestException> so not sure the right thing to handle. (curlexception seeems bad.)
 
                 .Handle<Exception>()
-                .WaitAndRetry(5, 
+                .WaitAndRetryAsync(5, 
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                     (e,t) => Console.WriteLine($"Exception {e} on {sasurl} -> {localpath}")
                     )
-                .Execute(async () =>
+                .ExecuteAsync(async () =>
                 {
                     using (var blob = await _contentClient.GetStreamAsync(sasurl))
                     using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
