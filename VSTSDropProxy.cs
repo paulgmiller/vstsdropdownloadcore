@@ -240,8 +240,11 @@ namespace dropdownloadcore
                 .Handle<Exception>()
                 .WaitAndRetryAsync(5, 
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    (e,t) => Console.WriteLine($"Exception {e} on {sasurl} -> {localpath}")
-                    )
+                    (e,t) => 
+                    {
+                        Console.WriteLine($"Exception {e.Message} on {sasurl} -> {localpath}");
+                        File.Delete(localpath);
+                    })
                 .ExecuteAsync(async () =>
                 {
                     using (var blob = await _contentClient.GetStreamAsync(sasurl))
