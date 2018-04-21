@@ -154,7 +154,6 @@ namespace dropdownloadcore
 
             //dictionary doesn't necesarily make sesne now.
             VstsFilesToDictionary(VSTSDropUri, files);
-            Console.WriteLine($"Found {_pathToUrl.Count} files,{_blobs.Count} unique ");
         }
 
         //private ILogger mLogger = null;
@@ -163,7 +162,7 @@ namespace dropdownloadcore
         private readonly string _relativeroot;
         
         private readonly Dictionary<string, string> _pathToUrl = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-        private readonly Dictionary<string, List<string>> _blobs = new Dictionary<string, List<string>>(StringComparer.InvariantCultureIgnoreCase);
+        private readonly Dictionary<string, UniqueFile> _blobs = new Dictionary<string, UniqueFile>(StringComparer.InvariantCultureIgnoreCase);
         
         //private static readonly string RootParam = "root";
   
@@ -201,6 +200,7 @@ namespace dropdownloadcore
             //https://1eswiki.com/wiki/CloudBuild_Duplicate_Binplace_Detection
             foreach (var file in files)
             {
+                //Console.WriteLine($"{file.Path}->{file.Blob.Url}");
                 if (_pathToUrl.ContainsKey(file.Path))
                 {
                     continue;
@@ -208,16 +208,24 @@ namespace dropdownloadcore
                 //ignore blobid/hash -- goodbye caching and verification
                 _pathToUrl[file.Path] = file.Blob.Url;
 
-                if (!_blobs.ContainsKey(file.Blob.Url) )
+                if (!_blobs.ContainsKey(file.Blob.Id) )
                 {
-                    _blobs[file.Blob.Url] = new List<string>( ) {  file.Path };
+                    _blobs[file.Blob.Id] = new UniqueFile { 
+                        Url = file.Blob.Url,
+                        Paths = new List<string> { file.Path }
+                    };
                 }
                 else
                 {
-                    _blobs[file.Blob.Url].Append( file.Path);
+                     _blobs[file.Blob.Id].Paths.Add( file.Path );
                 }
-                 
             }
+
+            Console.WriteLine($"Found {_pathToUrl.Count} files,{_blobs.Count} unique ");
+            int pathcount = _pathToUrl.Count;
+                int blobcount = _blobs.SelectMany(kvp => kvp.Value.Paths).Count();
+                if (pathcount != blobcount)
+                    throw new InvalidOperationException($"_pathToUrl {pathcount} != _blob {blobcount}");            
         }
 
         private HttpClient _contentClient = new HttpClient();
@@ -260,15 +268,15 @@ namespace dropdownloadcore
             int downloaded = 0;
             var downloads = _blobs.Select(async file => 
             {
-                if (!file.Value.Any()) throw new ArgumentException($"empty : {file.Key}");
+                if (!file.Value.Paths.Any()) throw new ArgumentException($"empty : {file.Key}");
                 
-                var firstpath = file.Value.First();
+                var firstpath = file.Value.Paths.First();
                 var localFileName = firstpath.Substring(_relativeroot.Length);
                 var localpath = Path.Combine(localDestiantion,localFileName).Replace("\\","/");
-                await Download(file.Key, localpath);
+                await Download(file.Value.Url, localpath);
                  
                 //parallize this too? worth it?
-                foreach (var other in file.Value.Skip(1))
+                foreach (var other in file.Value.Paths.Skip(1))
                 {
                     var otherFileName = other.Substring(_relativeroot.Length);
                     var otherpath = Path.Combine(localDestiantion,otherFileName).Replace("\\","/");
@@ -282,9 +290,12 @@ namespace dropdownloadcore
             });
             await Task.WhenAll(downloads);
         } 
-        
+    }
 
-   
+    public class UniqueFile
+    {
+        public string Url;
+        public List<string> Paths;
     }
 
     // Helper classes for parsing VSTS drop exe output lowercase to match json output
