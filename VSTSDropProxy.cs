@@ -247,10 +247,10 @@ namespace dropdownloadcore
                     })
                 .ExecuteAsync(async () =>
                 {
-                    using (var blob = await _contentClient.GetStreamAsync(sasurl))
+                    using (var blob = await _contentClient.GetStreamAsync(sasurl).ConfigureAwait(false))
                     using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
                     {
-                        await blob.CopyToAsync(fileStream);
+                        await blob.CopyToAsync(fileStream).ConfigureAwait(false);
                     }
                 });
         }
