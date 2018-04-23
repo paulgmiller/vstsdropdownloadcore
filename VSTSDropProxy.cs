@@ -233,16 +233,14 @@ namespace dropdownloadcore
         private async Task Download(string sasurl, string localpath)
         {
             await Policy
-                //don't catching exception but 
-                //System.AggregateException  ---> System.Net.Http.HttpRequestException ---> System.Net.Http.CurlException: Couldn't resolve host name
-                //got past handle<HttpRequestException> so not sure the right thing to handle. (curlexception seeems bad.)
-
-                .Handle<Exception>()
+                .Handle<HttpRequestException>()
+                .Or<IOException>()
+                .Or<TaskCanceledException>()
                 .WaitAndRetryAsync(5, 
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                     (e,t) => 
                     {
-                        Console.WriteLine($"Exception {e.Message} on {sasurl} -> {localpath}");
+                        Console.WriteLine($"Exception {e} on {sasurl} -> {localpath}");
                         File.Delete(localpath);
                     })
                 .ExecuteAsync(async () =>
@@ -255,7 +253,14 @@ namespace dropdownloadcore
                 });
         }
         
-        //this is still gross lose caching both witin and outside of builds
+         //So this only dedupes within a build.
+         //other options for perf.
+         // 1) only grab certain directories either with dockerfiles or as specified by build.yaml
+         // 2) Prioritize large files or files with lots of copies.
+         // 3) linux symlink instead of copy
+         // 4) parallelize copy with buffer first attempt at that with _contentClient.GetBufferAsync failed. Also lots of memory.
+         // 5) multistream copyasync
+         // Tried configureawait(false) and copyaync to each file (though not aparallelized) with no effect.
         public async Task Materialize(string localDestiantion)
         {
             //precreate directories so we don't have to worry.
