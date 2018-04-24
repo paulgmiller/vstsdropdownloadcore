@@ -1,14 +1,16 @@
-Steps to create container (should script)
-docker build . -t paulgmiller/vstsdropdownloadcore
-docker push paulgmiller/vstsdropdownloadcore
+## Steps to create container (uses a docker multistage build)
+- docker build . -t paulgmiller/vstsdropdownloadcore
+- docker push paulgmiller/vstsdropdownloadcore
+(obviously you can't push to paulgmiller so choose your own docker namespace)
 
-In the release definition you need to set.
+## In the release definition you need to set.
 
-In agent phase (allow scripts ot acces oauth)
+### In agent phase settings
+allow scripts ot access oauth
 
-In task
-ImageName:
-paulgmiller/vstsdropdownloadcore
-Environment variables :
-relativepath=<whateveer subpath>
-vstspat= $(System.AccessToken)
+### In task
+- ImageName: paulgmiller/vstsdropdownloadcore
+- Volumes: $(System.DefaultWorkingDirectory):/drop
+- Environment variables :
+  relativepath=<whatever subpath>
+  vstspat= $(System.AccessToken)
