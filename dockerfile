@@ -1,4 +1,4 @@
-﻿FROM microsoft/dotnet:2.0-runtime-stretch
+﻿FROM microsoft/dotnet:2.1-runtime-alpine
 
 # Metadata indicating an image maintainer.
 MAINTAINER pmiller@microsoft.com
