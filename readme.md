@@ -12,5 +12,5 @@ allow scripts ot access oauth
 - ImageName: paulgmiller/vstsdropdownloadcore
 - Volumes: $(System.DefaultWorkingDirectory):/drop
 - Environment variables :
-  relativepath=<whatever subpath>
-  vstspat= $(System.AccessToken)
+  - relativepath=__whatever subpath__
+  - vstspat= $(System.AccessToken)
