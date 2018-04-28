@@ -8,7 +8,6 @@ COPY *.csproj .
 RUN dotnet restore
 
 # copy everything else (just cs?) and build app
-
 COPY *.cs .
 
 RUN dotnet publish -c Release -o out
@@ -20,7 +19,6 @@ MAINTAINER pmiller@microsoft.com
 
 WORKDIR /app
 COPY --from=build /app/out .
-
 
 # Sets a command or process that will run each time a container is run from the new image.
 ENTRYPOINT ["dotnet", "dropdownloadcore.dll"]
