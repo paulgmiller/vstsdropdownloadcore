@@ -22,7 +22,7 @@ namespace DropDownloadCore
         {
             loggerFactory = new LoggerFactory();
             logger = loggerFactory.CreateLogger<Program>();
-            loggerFactory.AddConsole(LogLevel.Debug); // for now emit all logging info, TODO: make configurable?
+            loggerFactory.AddConsole(LogLevel.Information); // for now emit all logging info, TODO: make configurable?
             
             var relativePath = System.Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) ?? "/";
             var pat = System.Environment.GetEnvironmentVariable(VSTSPatEnvironmentVariable);
