@@ -65,9 +65,10 @@ namespace DropDownloadCore
                 var manifesturi = Munge(_VSTSDropUri, ManifestAPIVersion);
                  files = _dropApi.GetVstsManifest(manifesturi, BlobAPIVersion, _relativeroot ).Result;
             }
-            catch (Exception dropApiException) // gotta catch 'em all! -ash ketchexception.
+            catch (Exception)
             {
-                throw new DropException($"Not able to get build manifest please check your build '{VSTSDropUri}'", dropApiException);
+                _logger.LogError($"Not able to get build manifest please check your build '{VSTSDropUri}'");
+                throw;
             }
 
             // dictionary doesn't necesarily make sesne now.
@@ -101,22 +102,6 @@ namespace DropDownloadCore
                 throw new Exception("Encountered empty build drop check your build " + VSTSDropUri);
             }
 
-            // two iterations on files to check for badness and then do actual work below,
-            // could/should we combine?
-            var invalidFiles = false;
-            foreach (var f in files)
-            {
-                if (!f.IsValid)
-                {
-                    invalidFiles = true;
-                    _logger.LogError($"Invalid VSTS Files for {VSTSDropUri}: {f.Path} - {f.Blob.Url}");
-                }
-            }
-            if (invalidFiles)
-            {
-                throw new DropException($"invalid VSTS files for {VSTSDropUri}.");
-            }
-
             //cant do to dictionary because of duplicate binplacing. Cloudbuild can be set to break on this.
             //https://1eswiki.com/wiki/CloudBuild_Duplicate_Binplace_Detection
             foreach (var file in files)
@@ -143,12 +128,10 @@ namespace DropDownloadCore
             }
 
             _logger.LogInformation($"Found {_pathToUrl.Count} files, {_blobs.Count} unique");
-            int pathcount = _pathToUrl.Count;
-                int blobcount = _blobs.SelectMany(kvp => kvp.Value.Paths).Count();
-                if (pathcount != blobcount)
-                {
-                    throw new DropException($"_pathToUrl {pathcount} != _blob {blobcount}");            
-                }
+            //useful for debugging 
+            // int pathcount = _pathToUrl.Count;
+            // int blobcount = _blobs.SelectMany(kvp => kvp.Value.Paths).Count();
+            //Assert(pathcount != blobcount)
         }
 
         private async Task Download(string sasurl, string localpath)
@@ -237,13 +220,6 @@ namespace DropDownloadCore
     {
         public string Path { get; set; }
         public VstsBlob Blob { get; set; }
-
-        public bool IsValid {
-            get
-            {
-                return !string.IsNullOrWhiteSpace(Path) && Blob.IsValid;
-            }
-        }
     }
 
     public sealed class VstsBlob
@@ -251,12 +227,5 @@ namespace DropDownloadCore
         public string Url;
         public string Id;
 
-        public bool IsValid
-        {
-            get
-            {
-                return !string.IsNullOrWhiteSpace(Url) && !string.IsNullOrWhiteSpace(Id);
-            }
-        }
     }
 }

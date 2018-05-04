@@ -60,11 +60,6 @@ namespace DropDownloadCore
                 manifestRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", base64EncodedString);
                 
                 var manifestResponse = await client.SendAsync(manifestRequest);
-                if (manifestResponse.StatusCode == HttpStatusCode.NotFound)
-                {
-                    throw new DropException($"VSTS drop not found: {manifestUri}");
-                }                
-
                 if (manifestResponse.StatusCode == HttpStatusCode.RedirectMethod ||
                     manifestResponse.StatusCode == HttpStatusCode.Redirect)
                 {
