@@ -111,9 +111,9 @@ namespace DropDownloadCore
             /// <summary>
             /// Blob ids and SAS urls.
             /// </summary>
-            #pragma warning disable 0649
-            public IEnumerable<VstsBlob> Blobs;
-            #pragma warning restore 0169
+            
+            public IEnumerable<VstsBlob> Blobs { get; set; }
+            
         }
     }
 }
