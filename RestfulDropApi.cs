@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace DropDownloadCore
@@ -22,9 +21,8 @@ namespace DropDownloadCore
     {
         public static readonly string APIVersionParam = "api-version";
         private readonly string _pat;
-        private readonly ILogger _logger;
-
-        public RestfulDropApi(string pat, ILoggerFactory loggerFactory)
+        
+        public RestfulDropApi(string pat)
         {
             if (string.IsNullOrWhiteSpace(pat))
             {
@@ -32,8 +30,6 @@ namespace DropDownloadCore
             }
 
             _pat = pat;
-
-            _logger = loggerFactory.CreateLogger<RestfulDropApi>();
         }
         
         
@@ -49,16 +45,18 @@ namespace DropDownloadCore
         {
             // dotnet core doesn't currently handle vsts redirects well. Poking both teams about it
             // for now disable redirects.
+
             var clientHandler = new HttpClientHandler() { AllowAutoRedirect = false };
             using (var client = new HttpClient(clientHandler))
             {
                 var base64EncodedString = Convert.ToBase64String(Encoding.UTF8.GetBytes("vstsdockerbuild:" + _pat));
-                //Todo Polly for retries
-                _logger.LogDebug($"asking for drop manifest at {manifestUri}");
+                
+                Console.WriteLine($"asking for drop manifest at {manifestUri}");
                 
                 var manifestRequest = new HttpRequestMessage(HttpMethod.Get, manifestUri);
                 manifestRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", base64EncodedString);
                 
+                //Todo Polly for rety?
                 var manifestResponse = await client.SendAsync(manifestRequest);
                 if (manifestResponse.StatusCode == HttpStatusCode.RedirectMethod ||
                     manifestResponse.StatusCode == HttpStatusCode.Redirect)
@@ -87,7 +85,7 @@ namespace DropDownloadCore
                 queryParameters.Add(APIVersionParam, blobAPIVersion);
                 uriBuilder.Query = queryParameters.ToString();
                 
-                _logger.LogDebug($"asking for sas tokens at {uriBuilder.Uri}");
+                Console.WriteLine($"asking for sas tokens at {uriBuilder.Uri}");
                 var blobRequest = new HttpRequestMessage(HttpMethod.Post, uriBuilder.Uri);
                 blobRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", base64EncodedString);
                 blobRequest.Content = content;

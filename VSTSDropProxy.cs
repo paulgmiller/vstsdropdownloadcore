@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
-using Microsoft.Extensions.Logging;
 using Polly;
 
 namespace DropDownloadCore
@@ -31,16 +30,11 @@ namespace DropDownloadCore
         private readonly Dictionary<string, string> _pathToUrl = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
         private readonly Dictionary<string, UniqueFile> _blobs = new Dictionary<string, UniqueFile>(StringComparer.InvariantCultureIgnoreCase);
   
-        private readonly ILoggerFactory _loggerFactory; // might not need to hold this past ctor?
-        private readonly ILogger _logger;
-
-        public VSTSDropProxy(string VSTSDropUri, string path, string pat, ILoggerFactory loggerFactory)
+        public VSTSDropProxy(string VSTSDropUri, string path, string pat)
         {
-            _loggerFactory = loggerFactory;
-            _logger = _loggerFactory.CreateLogger<VSTSDropProxy>();
-
+            
             //mLogger = logger;
-            _dropApi = new RestfulDropApi(pat, _loggerFactory);
+            _dropApi = new RestfulDropApi(pat);
               
             if (!Uri.TryCreate(VSTSDropUri, UriKind.Absolute, out _VSTSDropUri))
             {
@@ -67,14 +61,14 @@ namespace DropDownloadCore
             }
             catch (Exception)
             {
-                _logger.LogError($"Not able to get build manifest please check your build '{VSTSDropUri}'");
+                Console.WriteLine($"Not able to get build manifest please check your build '{VSTSDropUri}'");
                 throw;
             }
 
             // dictionary doesn't necesarily make sesne now.
             // clocke: so what does?
             VstsFilesToDictionary(VSTSDropUri, files);
-            _logger.LogInformation($"Found {_pathToUrl.Count} files, {_blobs.Count} unique.");
+            Console.WriteLine($"Found {_pathToUrl.Count} files, {_blobs.Count} unique.");
         }
 
         /// <summary>
@@ -106,7 +100,7 @@ namespace DropDownloadCore
             //https://1eswiki.com/wiki/CloudBuild_Duplicate_Binplace_Detection
             foreach (var file in files)
             {
-                _logger.LogDebug($"{file.Path}->{file.Blob.Url}");
+                Console.WriteLine($"{file.Path}->{file.Blob.Url}");
                 if (_pathToUrl.ContainsKey(file.Path))
                 {
                     continue;
@@ -127,7 +121,7 @@ namespace DropDownloadCore
                 }
             }
 
-            _logger.LogInformation($"Found {_pathToUrl.Count} files, {_blobs.Count} unique");
+            Console.WriteLine($"Found {_pathToUrl.Count} files, {_blobs.Count} unique");
             //useful for debugging 
             // int pathcount = _pathToUrl.Count;
             // int blobcount = _blobs.SelectMany(kvp => kvp.Value.Paths).Count();
@@ -144,7 +138,7 @@ namespace DropDownloadCore
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                     (e,t) => 
                     {
-                        _logger.LogError(e, $"Exception {e} on {sasurl} -> {localpath}");
+                        Console.WriteLine($"Exception {e} on {sasurl} -> {localpath}");
                         File.Delete(localpath);
                     })
                 .ExecuteAsync(async () =>
@@ -200,7 +194,7 @@ namespace DropDownloadCore
                 }
                 if (++downloaded % 100 == 0)
                 {
-                    _logger.LogInformation($"Downloaded {downloaded} files");
+                    Console.WriteLine($"Downloaded {downloaded} files");
                 }
                 
             });

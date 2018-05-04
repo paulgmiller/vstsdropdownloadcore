@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Diagnostics;
 using Newtonsoft.Json;
-using Microsoft.Extensions.Logging;
 
 namespace DropDownloadCore
 {
@@ -15,15 +14,9 @@ namespace DropDownloadCore
         private const string DefaultDropDestination = "/drop";
         private const string DropUrlEnvironmentVariable = "dropurl";
 
-        private static ILoggerFactory loggerFactory;
-        private static ILogger logger;
-
+     
         static void Main(string[] args)
         {
-            loggerFactory = new LoggerFactory();
-            logger = loggerFactory.CreateLogger<Program>();
-            loggerFactory.AddConsole(LogLevel.Information); // for now emit all logging info, TODO: make configurable?
-            
             var relativePath = System.Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) ?? "/";
             var pat = System.Environment.GetEnvironmentVariable(VSTSPatEnvironmentVariable);
             if (string.IsNullOrWhiteSpace(pat) || pat.Equals("$(System.AccessToken)")) 
@@ -38,16 +31,16 @@ namespace DropDownloadCore
 
             // sample URL:
             // https://msasg.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/Aether_master/7dd31c59986465bfa9af3bd883cb35ce132979a2/e90d7f94-265a-86c7-5958-66983fdcaa06
-            logger.LogInformation($"url: {url}");
+            Console.WriteLine($"url: {url}");
             // /Release/Amd64/app/aether/AetherBackend
-            logger.LogInformation($"relative path: {relativePath}");
-            logger.LogInformation($"destination: {destination}");
-            var proxy = new VSTSDropProxy(url, relativePath, pat, loggerFactory);
+            Console.WriteLine($"relative path: {relativePath}");
+            Console.WriteLine($"destination: {destination}");
+            var proxy = new VSTSDropProxy(url, relativePath, pat);
             var sw = Stopwatch.StartNew();
             proxy.Materialize(destination).Wait();
             sw.Stop();
 
-            logger.LogInformation($"Finished in {sw.Elapsed}");
+            Console.WriteLine($"Finished in {sw.Elapsed}");
         }
 
         // agent based tasks automatically download artifacts from the build. 
