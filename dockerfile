@@ -3,12 +3,12 @@
 WORKDIR /app
 
 # copy csproj and restore as distinct layers
-COPY *.csproj .
+COPY *.csproj ./
 
 RUN dotnet restore
 
 # copy everything else (just cs?) and build app
-COPY *.cs .
+COPY *.cs ./
 
 RUN dotnet publish -c Release -o out
 
