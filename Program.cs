@@ -9,11 +9,11 @@ namespace DropDownloadCore
 {
     sealed class Program
     {
-        private const string RelavePathEnvironmentVariable = "RELATIVEPATH";
-        private const string VSTSPatEnvironmentVariable = "VSTSPAT";
-        private const string DropDestinationEnvironmentVariable = "DROPDESTINATION";
+        private const string RelavePathEnvironmentVariable = "relativepath";
+        private const string VSTSPatEnvironmentVariable = "vstspat";
+        private const string DropDestinationEnvironmentVariable = "dropdesitnation";
         private const string DefaultDropDestination = "/drop";
-        private const string DropUrlEnvironmentVariable = "DROPURL";
+        private const string DropUrlEnvironmentVariable = "dropurl";
 
         private static ILoggerFactory loggerFactory;
         private static ILogger logger;
