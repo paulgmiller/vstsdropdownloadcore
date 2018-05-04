@@ -4,6 +4,7 @@ using System.Linq;
 using System.Diagnostics;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 
 namespace DropDownloadCore
 {
@@ -22,6 +23,7 @@ namespace DropDownloadCore
         {
             loggerFactory = new LoggerFactory();
             logger = loggerFactory.CreateLogger<Program>();
+            var sad =  new ConsoleLoggerOptions() { DisableColors = true };
             loggerFactory.AddConsole(LogLevel.Information); // for now emit all logging info, TODO: make configurable?
             
             var relativePath = System.Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) ?? "/";
