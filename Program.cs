@@ -24,8 +24,13 @@ namespace DropDownloadCore
             logger = loggerFactory.CreateLogger<Program>();
             loggerFactory.AddConsole(LogLevel.Debug); // for now emit all logging info, TODO: make configurable?
             
-            var relativePath = System.Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable);
+            var relativePath = System.Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) ?? "/";
             var pat = System.Environment.GetEnvironmentVariable(VSTSPatEnvironmentVariable);
+            if (string.IsNullOrWhiteSpace(pat) || pat.Equals("$(System.AccessToken)")) 
+            {
+               throw new ArgumentException("Invalid personal accestoken. Remember to set allow scripts to access oauth token in agent phase");
+            }
+                
             var destination = System.Environment.GetEnvironmentVariable(DropDestinationEnvironmentVariable)
                               ?? DefaultDropDestination;
             var url = System.Environment.GetEnvironmentVariable(DropUrlEnvironmentVariable)
