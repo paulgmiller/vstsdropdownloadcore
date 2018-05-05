@@ -68,7 +68,6 @@ namespace DropDownloadCore
             // dictionary doesn't necesarily make sesne now.
             // clocke: so what does?
             VstsFilesToDictionary(VSTSDropUri, files);
-            Console.WriteLine($"Found {_pathToUrl.Count} files, {_blobs.Count} unique.");
         }
 
         /// <summary>
