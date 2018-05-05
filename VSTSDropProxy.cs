@@ -100,7 +100,6 @@ namespace DropDownloadCore
             //https://1eswiki.com/wiki/CloudBuild_Duplicate_Binplace_Detection
             foreach (var file in files)
             {
-                Console.WriteLine($"{file.Path}->{file.Blob.Url}");
                 if (_pathToUrl.ContainsKey(file.Path))
                 {
                     continue;
