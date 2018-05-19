@@ -5,9 +5,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Security.Cryptography;
 using System.Web;
 
 using Polly;
@@ -162,25 +164,22 @@ namespace DropDownloadCore
                     Console.WriteLine($"Downloaded {downloaded} files");
                 }                
             });
-
             await Task.WhenAll(downloads);
         } 
       
         private string HashFiles(IEnumerable<VstsFile> files)
         {
-           /* var hasher = new System.Security.Cryptography.SHA256Managed();
-            var allfiles = new StringBuilder();
+            var hasher = new System.Security.Cryptography.SHA256Managed();
+            hasher.Initialize();
             foreach( var f in files.OrderBy(f => f.Path))
             {
-                allfiles.Append(f.Path);
-                allfiles.Append(",");
-                allfiles.AppendLine(f.Blob.Id);
+                var buffer = Encoding.UTF8.GetBytes(f.Blob.Id);
+                hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
+                buffer = Encoding.UTF8.GetBytes(f.Path);
+                hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
             }
-            //this doesn't seem super efficient
-            var bytes = Encoding.UTF8.GetBytes(allfiles.ToString());
-            var hash = hasher.ComputeHash(bytes);
-            return System.BitConverter.ToString(hash).Replace("-","");*/
-            return "";
+            hasher.TransformFinalBlock(new byte[0], 0, 0);
+            return System.BitConverter.ToString(hasher.Hash).Replace("-","");
         }
     }
 
