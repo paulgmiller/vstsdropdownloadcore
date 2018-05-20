@@ -131,32 +131,41 @@ namespace DropDownloadCore
             foreach (var file in _files) //could do blobs.selectmany(vallues)
             {
                 var replativepath = file.Path.Substring(_relativeroot.Length);
-                var localpath = Path.Combine(localDestiantion,replativepath).Replace("\\","/");
+                var localpath = Path.Combine(localDestiantion,replativepath);
                 //also not efficient to check directory each time 
                 
                 Directory.CreateDirectory(Path.GetDirectoryName(localpath));
+                //Console.WriteLine($"Created {localpath} for {hash}");
                 var filename = Path.GetFileName(localpath);
-                if (filename.StartsWith("Dockerfile", StringComparison.OrdinalIgnoreCase))
+                if (filename.StartsWith("dockerfile", StringComparison.OrdinalIgnoreCase))
                 {
-                    dockerdirs.Add(Path.GetDirectoryName(replativepath));
+                    dockerdirs.Add(Path.GetDirectoryName(file.Path));
                 }
-             }
+            }
 
             //Altenatively would be neat to hash as we iterate throgh first loop
+            foreach (var ddir in dockerdirs)
+            {
+                var hash = HashFiles(_files.Where(f => f.Path.StartsWith(ddir)));
+                Console.WriteLine($"{ddir} -> {hash}");
+                var relativepath = ddir.Substring(_relativeroot.Length);
+                var localPath = Path.Combine(localDestiantion,relativepath);
+                await File.WriteAllTextAsync(Path.Combine(localPath, ".dirhash"), hash);
+            }
             
             int downloaded = 0;
             var downloads = uniquefiles.Select(async group => 
             {
                 var f = group.First();
                 var relativepath = f.Path.Substring(_relativeroot.Length);
-                var localPath = Path.Combine(localDestiantion,relativepath).Replace("\\","/");
+                var localPath = Path.Combine(localDestiantion,relativepath);
                 await Download(f.Blob.Url, localPath);
                  
                 // parallelize this too? worth it?
                 foreach (var other in group.Skip(1))
                 {
                     var otherrelativepath = other.Path.Substring(_relativeroot.Length);
-                    var otherpath = Path.Combine(localDestiantion,otherrelativepath).Replace("\\","/");
+                    var otherpath = Path.Combine(localDestiantion,otherrelativepath);
                     File.Copy(localPath, otherpath);
                 }
                 if (++downloaded % 100 == 0)
@@ -169,7 +178,7 @@ namespace DropDownloadCore
       
         private string HashFiles(IEnumerable<VstsFile> files)
         {
-            var hasher = new System.Security.Cryptography.SHA256Managed();
+            var hasher = new System.Security.Cryptography.HMACMD5();
             hasher.Initialize();
             foreach( var f in files.OrderBy(f => f.Path))
             {
@@ -179,6 +188,7 @@ namespace DropDownloadCore
                 hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
             }
             hasher.TransformFinalBlock(new byte[0], 0, 0);
+            //kinda want base 62
             return System.BitConverter.ToString(hasher.Hash).Replace("-","");
         }
     }
