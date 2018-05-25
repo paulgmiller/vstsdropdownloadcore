@@ -8,26 +8,23 @@ namespace DropDownloadCore
 {
     sealed class Program
     {
-        private const string RelavePathEnvironmentVariable = "relativepath";
-        private const string VSTSPatEnvironmentVariable = "vstspat";
-        private const string DropDestinationEnvironmentVariable = "dropdestination";
         private const string DefaultDropDestination = "/drop";
-        private const string DropUrlEnvironmentVariable = "dropurl";
-
      
         static void Main(string[] args)
         {
-            var relativePath = System.Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) ?? "/";
-            var pat = System.Environment.GetEnvironmentVariable(VSTSPatEnvironmentVariable);
+            dropdownloadcore.Args arguments = new dropdownloadcore.Args();
+
+            arguments.Parse(args);
+            
+            var relativePath = arguments.RelativePath ?? "/";
+            var pat = arguments.VstsPat;
             if (string.IsNullOrWhiteSpace(pat) || pat.Equals("$(System.AccessToken)")) 
             {
                throw new ArgumentException("Invalid personal accestoken. Remember to set allow scripts to access oauth token in agent phase");
             }
                 
-            var destination = System.Environment.GetEnvironmentVariable(DropDestinationEnvironmentVariable)
-                              ?? DefaultDropDestination;
-            var url = System.Environment.GetEnvironmentVariable(DropUrlEnvironmentVariable)
-                      ?? ExtractDropUrl(destination);
+            var destination = arguments.DropDestination ?? DefaultDropDestination;
+            var url = arguments.DropUrl ?? ExtractDropUrl(destination);
 
             // sample URL:
             // https://msasg.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/Aether_master/7dd31c59986465bfa9af3bd883cb35ce132979a2/e90d7f94-265a-86c7-5958-66983fdcaa06
