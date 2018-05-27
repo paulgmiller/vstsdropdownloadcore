@@ -40,7 +40,7 @@ namespace DropDownloadCore
         /// <param name="blobAPIVersion">The API version to use for the blob API.</param>
         /// <param name="relativeRoot">The root path relative to the drop to retrieve.</param>
         /// <returns>The manifest details.</returns>         
-        public async Task<IEnumerable<VstsFile>> GetVstsManifest(Uri manifestUri, string blobAPIVersion, 
+        public async Task<ISet<VstsFile>> GetVstsManifest(Uri manifestUri, string blobAPIVersion, 
                                                                  string relativeRoot)
         {
             // dotnet core doesn't currently handle vsts redirects well. Poking both teams about it
@@ -67,8 +67,9 @@ namespace DropDownloadCore
                 string manifestContent = await manifestResponse.Content.ReadAsStringAsync();
                      
                 //filter here so we can be case insensitve. manifest url would take a directory but unlike root in drop.exe it is case sensitve.
+                //derserialize from stream in future to not buffer as much?
                 var manifest = JsonConvert.DeserializeObject<List<VstsFile>>(manifestContent)
-                                    .Where(f => f.Path.StartsWith(relativeRoot, StringComparison.OrdinalIgnoreCase));
+                                    .Where(f => f.Path.StartsWith(relativeRoot, StringComparison.OrdinalIgnoreCase)).ToList();
                 
                 
                 // forget what our limit was but this would be bad for a whole drop. Batch has a certain
@@ -100,7 +101,7 @@ namespace DropDownloadCore
                 {
                     file.Blob.Url = urlDictionary[file.Blob.Id];
                 }
-                return manifest;
+                return new HashSet<VstsFile>(manifest);
             }
         }   
 

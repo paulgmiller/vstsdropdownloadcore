@@ -7,6 +7,6 @@ namespace DropDownloadCore
     // Let us mock out drop http calls.
     public interface IDropApi
     {
-         Task<IEnumerable<VstsFile>> GetVstsManifest(Uri manifestUri, string blobapiversion, string relativeroot);
+         Task<ISet<VstsFile>> GetVstsManifest(Uri manifestUri, string blobapiversion, string relativeroot);
     }
 }

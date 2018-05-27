@@ -5,9 +5,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Security.Cryptography;
 using System.Web;
 
 using Polly;
@@ -27,13 +29,11 @@ namespace DropDownloadCore
         private readonly Uri _VSTSDropUri;
         private readonly string _relativeroot;
         
-        private readonly Dictionary<string, string> _pathToUrl = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-        private readonly Dictionary<string, UniqueFile> _blobs = new Dictionary<string, UniqueFile>(StringComparer.InvariantCultureIgnoreCase);
-  
+        private readonly ISet<VstsFile> _files;
+        
         public VSTSDropProxy(string VSTSDropUri, string path, string pat)
         {
             
-            //mLogger = logger;
             _dropApi = new RestfulDropApi(pat);
               
             if (!Uri.TryCreate(VSTSDropUri, UriKind.Absolute, out _VSTSDropUri))
@@ -53,11 +53,10 @@ namespace DropDownloadCore
                 _relativeroot = _relativeroot + "/";
 
             //move this to a lazy so we can actually be async?
-            IEnumerable<VstsFile> files = null;
             try
             {
                 var manifesturi = Munge(_VSTSDropUri, ManifestAPIVersion);
-                 files = _dropApi.GetVstsManifest(manifesturi, BlobAPIVersion, _relativeroot ).Result;
+                _files = _dropApi.GetVstsManifest(manifesturi, BlobAPIVersion, _relativeroot ).Result;
             }
             catch (Exception)
             {
@@ -65,9 +64,11 @@ namespace DropDownloadCore
                 throw;
             }
 
-            // dictionary doesn't necesarily make sesne now.
-            // clocke: so what does?
-            VstsFilesToDictionary(VSTSDropUri, files);
+           if (!_files.Any())
+           {
+                throw new ArgumentException("Encountered empty build drop check your build " + VSTSDropUri);
+            }
+            //https://1eswiki.com/wiki/CloudBuild_Duplicate_Binplace_Detection
         }
 
         /// <summary>
@@ -86,44 +87,6 @@ namespace DropDownloadCore
             uriBuilder.Query = queryParameters.ToString();
             
             return uriBuilder.Uri;
-        }
-
-        private void VstsFilesToDictionary(string VSTSDropUri, IEnumerable<VstsFile> files)
-        {
-            if (!files.Any())
-            {
-                throw new Exception("Encountered empty build drop check your build " + VSTSDropUri);
-            }
-
-            //cant do to dictionary because of duplicate binplacing. Cloudbuild can be set to break on this.
-            //https://1eswiki.com/wiki/CloudBuild_Duplicate_Binplace_Detection
-            foreach (var file in files)
-            {
-                if (_pathToUrl.ContainsKey(file.Path))
-                {
-                    continue;
-                }
-                //ignore blobid/hash -- goodbye caching and verification
-                _pathToUrl[file.Path] = file.Blob.Url;
-
-                if (!_blobs.ContainsKey(file.Blob.Id))
-                {
-                    _blobs[file.Blob.Id] = new UniqueFile { 
-                        Url = file.Blob.Url,
-                        Paths = new List<string> { file.Path }
-                    };
-                }
-                else
-                {
-                     _blobs[file.Blob.Id].Paths.Add( file.Path );
-                }
-            }
-
-            Console.WriteLine($"Found {_pathToUrl.Count} files, {_blobs.Count} unique");
-            //useful for debugging 
-            // int pathcount = _pathToUrl.Count;
-            // int blobcount = _blobs.SelectMany(kvp => kvp.Value.Paths).Count();
-            //Assert(pathcount != blobcount)
         }
 
         private async Task Download(string sasurl, string localpath)
@@ -159,52 +122,66 @@ namespace DropDownloadCore
          // Tried configureawait(false) and copyaync to each file (though not aparallelized) with no effect.
         public async Task Materialize(string localDestiantion)
         {
+            var uniqueblobs = _files.GroupBy(file => file.Blob.Id).ToList();
+            Console.WriteLine($"Found {_files.Count} files, {uniqueblobs.Count} unique");
+            
+            var dockerdirs = new HashSet<string>();
             //precreate directories so we don't have to worry.
             //slow but we don't care cause we want to move off and have sangam use blobs directly
-            foreach (var file in _pathToUrl) //could do blobs.selectmany(vallues)
+            foreach (var file in _files) //could do blobs.selectmany(vallues)
             {
-                var localFileName = file.Key.Substring(_relativeroot.Length);
-                var localpath = Path.Combine(localDestiantion,localFileName).Replace("\\","/");
-                //also not efficient to check directory each time but again this method is a hack.
-                Directory.CreateDirectory(Path.GetDirectoryName(localpath));
-            }
-
-            int downloaded = 0;
-            var downloads = _blobs.Select(async file => 
-            {
-                if (!file.Value.Paths.Any())
-                {
-                    // should this be DropException?
-                    throw new ArgumentException($"empty : {file.Key}");
-                }
+                var replativepath = file.Path.Substring(_relativeroot.Length);
+                var localpath = Path.Combine(localDestiantion,replativepath).Replace("\\","/");
+                //also not efficient to check directory each time 
                 
-                var firstPath = file.Value.Paths.First();
-                var localFilename = firstPath.Substring(_relativeroot.Length);
-                var localPath = Path.Combine(localDestiantion,localFilename).Replace("\\","/");
-                await Download(file.Value.Url, localPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(localpath));
+                var filename = Path.GetFileName(localpath);
+                if (filename.StartsWith("Dockerfile", StringComparison.OrdinalIgnoreCase))
+                {
+                    dockerdirs.Add(Path.GetDirectoryName(replativepath));
+                }
+             }
+
+            //Altenatively would be neat to hash as we iterate throgh first loop
+            
+            int downloaded = 0;
+            var downloads = uniqueblobs.Select(async group => 
+            {
+                var f = group.First();
+                var relativepath = f.Path.Substring(_relativeroot.Length);
+                var localPath = Path.Combine(localDestiantion,relativepath).Replace("\\","/");
+                await Download(f.Blob.Url, localPath);
                  
                 // parallelize this too? worth it?
-                foreach (var other in file.Value.Paths.Skip(1))
+                foreach (var other in group.Skip(1))
                 {
-                    var otherFileName = other.Substring(_relativeroot.Length);
-                    var otherpath = Path.Combine(localDestiantion,otherFileName).Replace("\\","/");
+                    var otherrelativepath = other.Path.Substring(_relativeroot.Length);
+                    var otherpath = Path.Combine(localDestiantion,otherrelativepath).Replace("\\","/");
                     File.Copy(localPath, otherpath);
                 }
                 if (++downloaded % 100 == 0)
                 {
                     Console.WriteLine($"Downloaded {downloaded} files");
-                }
-                
+                }                
             });
-
             await Task.WhenAll(downloads);
         } 
-    }
-
-    struct UniqueFile
-    {
-        public string Url;
-        public List<string> Paths;
+      
+        private string HashFiles(IEnumerable<VstsFile> files)
+        {
+            var hasher = new System.Security.Cryptography.SHA256Managed();
+            hasher.Initialize();
+            foreach( var f in files.OrderBy(f => f.Path))
+            {
+                var buffer = Encoding.UTF8.GetBytes(f.Blob.Id);
+                hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
+                buffer = Encoding.UTF8.GetBytes(f.Path);
+                hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
+            }
+            hasher.TransformFinalBlock(new byte[0], 0, 0);
+            //can we make this shorter by not using hex? base64 has chars that don't work in docker tags
+            return System.BitConverter.ToString(hasher.Hash).Replace("-","");
+        }
     }
 
     // Helper classes for parsing VSTS drop exe output lowercase to match json output
@@ -212,6 +189,8 @@ namespace DropDownloadCore
     {
         public string Path { get; set; }
         public VstsBlob Blob { get; set; }
+
+        public override int GetHashCode() { return StringComparer.OrdinalIgnoreCase.GetHashCode(Path); }
     }
 
     public sealed class VstsBlob
