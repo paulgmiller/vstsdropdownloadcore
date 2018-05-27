@@ -10,7 +10,7 @@ namespace DropDownloadCore
     {
         private const string RelavePathEnvironmentVariable = "relativepath";
         private const string VSTSPatEnvironmentVariable = "vstspat";
-        private const string DropDestinationEnvironmentVariable = "dropdesitnation";
+        private const string DropDestinationEnvironmentVariable = "dropdestination";
         private const string DefaultDropDestination = "/drop";
         private const string DropUrlEnvironmentVariable = "dropurl";
 
