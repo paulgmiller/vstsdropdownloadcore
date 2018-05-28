@@ -131,11 +131,10 @@ namespace DropDownloadCore
             foreach (var file in _files) //could do blobs.selectmany(vallues)
             {
                 var replativepath = file.Path.Substring(_relativeroot.Length);
-                var localpath = Path.Combine(localDestiantion,replativepath);
+                var localpath = Path.Combine(localDestiantion,replativepath).Replace("\\","/");
                 //also not efficient to check directory each time 
                 
                 Directory.CreateDirectory(Path.GetDirectoryName(localpath));
-                //Console.WriteLine($"Created {localpath} for {hash}");
                 var filename = Path.GetFileName(localpath);
                 if (filename.StartsWith("dockerfile", StringComparison.OrdinalIgnoreCase))
                 {
@@ -153,20 +152,21 @@ namespace DropDownloadCore
                 var localPath = Path.Combine(localDestiantion,relativepath);
                 await File.WriteAllTextAsync(Path.Combine(localPath, ".dirhash"), hash);
             }
+
             
             int downloaded = 0;
             var downloads = uniqueblobs.Select(async group => 
             {
                 var f = group.First();
                 var relativepath = f.Path.Substring(_relativeroot.Length);
-                var localPath = Path.Combine(localDestiantion,relativepath);
+                var localPath = Path.Combine(localDestiantion,relativepath).Replace("\\","/");
                 await Download(f.Blob.Url, localPath);
                  
                 // parallelize this too? worth it?
                 foreach (var other in group.Skip(1))
                 {
                     var otherrelativepath = other.Path.Substring(_relativeroot.Length);
-                    var otherpath = Path.Combine(localDestiantion,otherrelativepath);
+                    var otherpath = Path.Combine(localDestiantion,otherrelativepath).Replace("\\","/");
                     File.Copy(localPath, otherpath);
                 }
                 if (++downloaded % 100 == 0)

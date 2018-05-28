@@ -10,7 +10,7 @@ namespace DropDownloadCore
     {
         private const string RelavePathEnvironmentVariable = "relativepath";
         private const string VSTSPatEnvironmentVariable = "vstspat";
-        private const string DropDestinationEnvironmentVariable = "dropdesitnation";
+        private const string DropDestinationEnvironmentVariable = "dropdestination";
         private const string DefaultDropDestination = "/drop";
         private const string DropUrlEnvironmentVariable = "dropurl";
 
@@ -49,8 +49,29 @@ namespace DropDownloadCore
         private static string ExtractDropUrl(string workingDirectory)
         {
             //could take an envdir on what the build dir is for now though we just have one build
-            var buildDirectory = Directory.GetDirectories(workingDirectory).Single();
-            var guidDirectory = Directory.GetDirectories(buildDirectory).Single();
+            string buildDirectory = string.Empty;
+            string guidDirectory = string.Empty;
+
+            try
+            {
+                buildDirectory = Directory.GetDirectories(workingDirectory).Single();
+            }
+            catch (Exception)
+            {
+                Console.WriteLine($"The working directory, {workingDirectory}, is invalid");
+                throw;
+            }
+
+            try
+            {
+                guidDirectory = Directory.GetDirectories(buildDirectory).Single();
+            }
+            catch (Exception)
+            {
+                Console.WriteLine($"The build directory, {buildDirectory}, is invalid");
+                throw;
+            }
+
             var dropJSONFilename = Path.Combine(workingDirectory, buildDirectory,  guidDirectory, "VSTSDrop.json");
 
             // https://www.newtonsoft.com/json/help/html/DeserializeAnonymousType.htm
