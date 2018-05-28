@@ -66,7 +66,7 @@ namespace DropDownloadCore
 
            if (!_files.Any())
            {
-                throw new Exception("Encountered empty build drop check your build " + VSTSDropUri);
+                throw new ArgumentException("Encountered empty build drop check your build " + VSTSDropUri);
             }
             //https://1eswiki.com/wiki/CloudBuild_Duplicate_Binplace_Detection
         }
@@ -122,8 +122,8 @@ namespace DropDownloadCore
          // Tried configureawait(false) and copyaync to each file (though not aparallelized) with no effect.
         public async Task Materialize(string localDestiantion)
         {
-            var uniquefiles = _files.GroupBy(file => file.Blob.Id).ToList();
-            Console.WriteLine($"Found {_files.Count} files, {uniquefiles.Count} unique");
+            var uniqueblobs = _files.GroupBy(file => file.Blob.Id).ToList();
+            Console.WriteLine($"Found {_files.Count} files, {uniqueblobs.Count} unique");
             
             var dockerdirs = new HashSet<string>();
             //precreate directories so we don't have to worry.
@@ -146,15 +146,16 @@ namespace DropDownloadCore
             //Altenatively would be neat to hash as we iterate throgh first loop
             foreach (var ddir in dockerdirs)
             {
-                var hash = HashFiles(_files.Where(f => f.Path.StartsWith(ddir)));
-                Console.WriteLine($"{ddir} -> {hash}");
+                var dirfiles = _files.Where(f => f.Path.StartsWith(ddir)).ToList();
+                var hash = HashFiles(dirfiles);
+                Console.WriteLine($"{ddir} ({dirfiles.Count})-> {hash}");
                 var relativepath = ddir.Substring(_relativeroot.Length);
                 var localPath = Path.Combine(localDestiantion,relativepath);
                 await File.WriteAllTextAsync(Path.Combine(localPath, ".dirhash"), hash);
             }
             
             int downloaded = 0;
-            var downloads = uniquefiles.Select(async group => 
+            var downloads = uniqueblobs.Select(async group => 
             {
                 var f = group.First();
                 var relativepath = f.Path.Substring(_relativeroot.Length);
@@ -188,7 +189,7 @@ namespace DropDownloadCore
                 hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
             }
             hasher.TransformFinalBlock(new byte[0], 0, 0);
-            //kinda want base 62
+            //can we make this shorter by not using hex? base64 has chars that don't work in docker tags
             return System.BitConverter.ToString(hasher.Hash).Replace("-","");
         }
     }
