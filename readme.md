@@ -16,7 +16,7 @@ allow scripts to access oauth
 
 - ImageName: paulgmiller/vstsdropdownloadcore
 - Volumes: $(System.DefaultWorkingDirectory):/drop
-- Environment variables to set:
+- Environment variables to set (you can all use commandline args)
   - RELATIVEPATH: __whatever subpath__
   - VSTSPAT: $(System.AccessToken) (VSTS personal access token)
   - DROPDESTINATION: Destination for drop data (or /drop if unspecified)
