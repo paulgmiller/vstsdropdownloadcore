@@ -1,3 +1,5 @@
+https://msasg.visualstudio.com/_apis/public/build/definitions/b03927a9-4d41-4a29-865d-b1d980f6dee9/5569/badge
+
 # VSTS Drop downloader for Linux
 
 ## Steps to create container (uses a docker multistage build)
