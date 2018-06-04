@@ -12,16 +12,7 @@ namespace DropDownloadCore
      
         static void Main(string[] args)
         {
-            dropdownloadcore.Args arguments = new dropdownloadcore.Args();
-
-            arguments.Parse(args);
-            
-            var relativePath = arguments.RelativePath ?? "/";
-            var pat = arguments.VstsPat;
-            if (string.IsNullOrWhiteSpace(pat) || pat.Equals("$(System.AccessToken)")) 
-            {
-               throw new ArgumentException("Invalid personal accestoken. Remember to set allow scripts to access oauth token in agent phase");
-            }
+            dropdownloadcore.Args arguments = new dropdownloadcore.Args(args);
                 
             var destination = arguments.DropDestination ?? DefaultDropDestination;
             var url = arguments.DropUrl ?? ExtractDropUrl(destination);
@@ -30,9 +21,9 @@ namespace DropDownloadCore
             // https://msasg.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/Aether_master/7dd31c59986465bfa9af3bd883cb35ce132979a2/e90d7f94-265a-86c7-5958-66983fdcaa06
             Console.WriteLine($"url: {url}");
             // /Release/Amd64/app/aether/AetherBackend
-            Console.WriteLine($"relative path: {relativePath}");
+            Console.WriteLine($"relative arguments.VstsPath: {arguments.RelativePath}");
             Console.WriteLine($"destination: {destination}");
-            var proxy = new VSTSDropProxy(url, relativePath, pat);
+            var proxy = new VSTSDropProxy(url, arguments.RelativePath, arguments.VstsPat);
             var sw = Stopwatch.StartNew();
             proxy.Materialize(destination).Wait();
             sw.Stop();

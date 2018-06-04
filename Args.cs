@@ -4,6 +4,12 @@ namespace dropdownloadcore
 {
     public class Args
     {
+        private const string RelavePathEnvironmentVariable = "relativepath";
+        private const string VSTSPatEnvironmentVariable = "vstspat";
+        private const string DropDestinationEnvironmentVariable = "dropdestination";
+        private const string DefaultDropDestination = "/drop";
+        private const string DropUrlEnvironmentVariable = "dropurl";
+
         public string VstsPat { get; set; }
 
         public string DropDestination { get; set; }
@@ -11,6 +17,20 @@ namespace dropdownloadcore
         public string DropUrl { get; set; }
 
         public string RelativePath { get; set; }
+
+        public Args()
+        {
+            this.VstsPat = null;
+            this.DropDestination = null;
+            this.DropUrl = null;
+            this.RelativePath = null;
+        }
+
+        public Args(string[] args)
+            : this()
+        {
+            this.Parse(args);
+        }
 
         public void Parse(string[] args)
         {
@@ -55,6 +75,42 @@ namespace dropdownloadcore
                         continue;
                     }
                 }
+
+            }
+
+            this.CheckEnvironmentVariables();
+            this.ValidatePat();
+        }
+
+        public void CheckEnvironmentVariables()
+        {
+            if (this.VstsPat == null)
+            {
+                this.VstsPat = System.Environment.GetEnvironmentVariable(VSTSPatEnvironmentVariable);
+            }
+
+            if (this.DropDestination == null)
+            {
+                this.DropDestination = System.Environment.GetEnvironmentVariable(DropDestinationEnvironmentVariable)
+                                       ?? DefaultDropDestination;
+            }
+
+            if (this.DropUrl == null)
+            {
+                this.DropUrl = System.Environment.GetEnvironmentVariable(DropUrlEnvironmentVariable);
+            }
+
+            if (this.RelativePath == null)
+            {
+                this.RelativePath = System.Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) ?? "/";
+            }
+        }
+
+        public void ValidatePat()
+        {
+            if (string.IsNullOrWhiteSpace(this.VstsPat) || this.VstsPat.Equals("$(System.AccessToken)"))
+            {
+                throw new ArgumentException("Invalid personal accestoken. Remember to set allow scripts to access oauth token in agent phase");
             }
         }
 
@@ -75,7 +131,13 @@ namespace dropdownloadcore
 
         private bool IsValidArg(string[] args, int index)
         {
-            return (index < args.Length - 1 && !args[index + 1].StartsWith("-"));
+            bool valid = (index < args.Length - 1 && !args[index + 1].StartsWith("-"));
+            if (!valid)
+            {
+                this.ThrowInvalidArgument(args, index);
+            }
+
+            return valid;
         }
 
         private void ThrowInvalidArgument(string[] arguments, int index)
