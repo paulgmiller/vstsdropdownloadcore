@@ -52,7 +52,7 @@ namespace DropDownloadCore
                 Console.WriteLine(dir);
             }
 
-            var parentPath = Path.GetFullPath(currDir + "..");
+            var parentPath = Path.GetFullPath(currDir + "\\..");
             string[] siblingDirectories = Directory.GetDirectories(parentPath);
             Console.WriteLine("sibling directories: ");
             foreach (string dir in siblingDirectories)
