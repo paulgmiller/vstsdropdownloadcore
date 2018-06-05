@@ -3,29 +3,32 @@ using System.IO;
 using System.Linq;
 using System.Diagnostics;
 using Newtonsoft.Json;
+using CommandLine;
 
 namespace DropDownloadCore
 {
     sealed class Program
     {
-        private const string DefaultDropDestination = "/drop";
-     
         static void Main(string[] args)
         {
-            dropdownloadcore.Args arguments = new dropdownloadcore.Args(args);
-                
-            var destination = arguments.DropDestination ?? DefaultDropDestination;
-            var url = arguments.DropUrl ?? ExtractDropUrl(destination);
+            var result = CommandLine.Parser.Default.ParseArguments<Args>(args)
+                 .WithParsed<Args>(a => Run(a));
+        }
+
+        static void Run(Args a)
+        {
+            a.ValidatePat();
+            var url = a.DropUrl ?? ExtractDropUrl(a.DropDestination);
 
             // sample URL:
             // https://msasg.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/Aether_master/7dd31c59986465bfa9af3bd883cb35ce132979a2/e90d7f94-265a-86c7-5958-66983fdcaa06
             Console.WriteLine($"url: {url}");
             // /Release/Amd64/app/aether/AetherBackend
-            Console.WriteLine($"relative arguments.VstsPath: {arguments.RelativePath}");
-            Console.WriteLine($"destination: {destination}");
-            var proxy = new VSTSDropProxy(url, arguments.RelativePath, arguments.VstsPat);
+            Console.WriteLine($"relative path: {a.RelativePath}");
+            Console.WriteLine($"destination: {a.DropDestination}");
+            var proxy = new VSTSDropProxy(url, a.RelativePath, a.VstsPat);
             var sw = Stopwatch.StartNew();
-            proxy.Materialize(destination).Wait();
+            proxy.Materialize(a.DropDestination).Wait();
             sw.Stop();
 
             Console.WriteLine($"Finished in {sw.Elapsed}");
