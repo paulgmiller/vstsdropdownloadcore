@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
+using System.Reflection;
 using Newtonsoft.Json;
 using CommandLine;
 
@@ -40,30 +41,21 @@ namespace DropDownloadCore
         private static string ExtractDropUrl(string workingDirectory)
         {
             //could take an envdir on what the build dir is for now though we just have one build
-            string buildDirectory = string.Empty;
             string guidDirectory = string.Empty;
 
-            try
-            {
-                buildDirectory = Directory.GetDirectories(workingDirectory).Single();
-            }
-            catch (Exception)
-            {
-                Console.WriteLine($"The working directory, {workingDirectory}, is invalid");
-                throw;
-            }
+            Console.WriteLine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
 
             try
             {
-                guidDirectory = Directory.GetDirectories(buildDirectory).Single();
+                guidDirectory = Directory.GetDirectories(workingDirectory).Single();
             }
             catch (Exception)
             {
-                Console.WriteLine($"The build directory, {buildDirectory}, is invalid");
+                Console.WriteLine($"The build directory, {workingDirectory}, is invalid");
                 throw;
             }
 
-            var dropJSONFilename = Path.Combine(workingDirectory, buildDirectory,  guidDirectory, "VSTSDrop.json");
+            var dropJSONFilename = Path.Combine(workingDirectory,  guidDirectory, "VSTSDrop.json");
 
             // https://www.newtonsoft.com/json/help/html/DeserializeAnonymousType.htm
             var definition = new { VstsDropBuildArtifact = new {VstsDropUrl ="" } };
