@@ -42,8 +42,23 @@ namespace DropDownloadCore
         {
             //could take an envdir on what the build dir is for now though we just have one build
             string guidDirectory = string.Empty;
+            string currDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            Console.WriteLine(currDir);
+            string[] childDirectories = Directory.GetDirectories(currDir);
 
-            Console.WriteLine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
+            Console.WriteLine("Child directories: ");
+            foreach (string dir in childDirectories)
+            {
+                Console.WriteLine(dir);
+            }
+
+            var parentPath = Path.GetFullPath(currDir + "..");
+            string[] siblingDirectories = Directory.GetDirectories(parentPath);
+            Console.WriteLine("sibling directories: ");
+            foreach (string dir in siblingDirectories)
+            {
+                Console.WriteLine(dir);
+            }
 
             try
             {
