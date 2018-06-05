@@ -46,16 +46,17 @@ namespace DropDownloadCore
             Console.WriteLine(currDir);
             string[] childDirectories = Directory.GetDirectories(currDir);
 
-            Console.WriteLine("Child directories: ");
-            foreach (string dir in childDirectories)
+            var parentPath = Path.GetFullPath(workingDirectory);
+            string[] siblingDirectories = Directory.GetDirectories(parentPath);
+            Console.WriteLine("directories: ");
+            foreach (string dir in siblingDirectories)
             {
                 Console.WriteLine(dir);
             }
 
-            var parentPath = Path.GetFullPath("/");
-            string[] siblingDirectories = Directory.GetDirectories(parentPath);
-            Console.WriteLine("sibling directories: ");
-            foreach (string dir in siblingDirectories)
+            string[] siblingFiles = Directory.GetFiles(parentPath);
+            Console.WriteLine("files: ");
+            foreach (string dir in siblingFiles)
             {
                 Console.WriteLine(dir);
             }
