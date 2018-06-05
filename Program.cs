@@ -46,21 +46,6 @@ namespace DropDownloadCore
             Console.WriteLine(currDir);
             string[] childDirectories = Directory.GetDirectories(currDir);
 
-            var parentPath = Path.GetFullPath(workingDirectory);
-            string[] siblingDirectories = Directory.GetDirectories("/drop");
-            Console.WriteLine("directories: ");
-            foreach (string dir in siblingDirectories)
-            {
-                Console.WriteLine(dir);
-            }
-
-            string[] siblingFiles = Directory.GetFiles("/drop");
-            Console.WriteLine("files: ");
-            foreach (string dir in siblingFiles)
-            {
-                Console.WriteLine(dir);
-            }
-
             try
             {
                 guidDirectory = Directory.GetDirectories(workingDirectory).Single();
