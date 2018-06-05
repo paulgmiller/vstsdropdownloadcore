@@ -3,41 +3,32 @@ using System.IO;
 using System.Linq;
 using System.Diagnostics;
 using Newtonsoft.Json;
+using CommandLine;
 
 namespace DropDownloadCore
 {
     sealed class Program
     {
-        private const string RelavePathEnvironmentVariable = "relativepath";
-        private const string VSTSPatEnvironmentVariable = "vstspat";
-        private const string DropDestinationEnvironmentVariable = "dropdestination";
-        private const string DefaultDropDestination = "/drop";
-        private const string DropUrlEnvironmentVariable = "dropurl";
-
-     
         static void Main(string[] args)
         {
-            var relativePath = System.Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) ?? "/";
-            var pat = System.Environment.GetEnvironmentVariable(VSTSPatEnvironmentVariable);
-            if (string.IsNullOrWhiteSpace(pat) || pat.Equals("$(System.AccessToken)")) 
-            {
-               throw new ArgumentException("Invalid personal accestoken. Remember to set allow scripts to access oauth token in agent phase");
-            }
-                
-            var destination = System.Environment.GetEnvironmentVariable(DropDestinationEnvironmentVariable)
-                              ?? DefaultDropDestination;
-            var url = System.Environment.GetEnvironmentVariable(DropUrlEnvironmentVariable)
-                      ?? ExtractDropUrl(destination);
+            var result = CommandLine.Parser.Default.ParseArguments<Args>(args)
+                 .WithParsed<Args>(a => Run(a));
+        }
+
+        static void Run(Args a)
+        {
+            a.ValidatePat();
+            var url = a.DropUrl ?? ExtractDropUrl(a.DropDestination);
 
             // sample URL:
             // https://msasg.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/Aether_master/7dd31c59986465bfa9af3bd883cb35ce132979a2/e90d7f94-265a-86c7-5958-66983fdcaa06
             Console.WriteLine($"url: {url}");
             // /Release/Amd64/app/aether/AetherBackend
-            Console.WriteLine($"relative path: {relativePath}");
-            Console.WriteLine($"destination: {destination}");
-            var proxy = new VSTSDropProxy(url, relativePath, pat);
+            Console.WriteLine($"relative path: {a.RelativePath}");
+            Console.WriteLine($"destination: {a.DropDestination}");
+            var proxy = new VSTSDropProxy(url, a.RelativePath, a.VstsPat);
             var sw = Stopwatch.StartNew();
-            proxy.Materialize(destination).Wait();
+            proxy.Materialize(a.DropDestination).Wait();
             sw.Stop();
 
             Console.WriteLine($"Finished in {sw.Elapsed}");
