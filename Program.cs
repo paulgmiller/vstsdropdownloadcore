@@ -47,14 +47,14 @@ namespace DropDownloadCore
             string[] childDirectories = Directory.GetDirectories(currDir);
 
             var parentPath = Path.GetFullPath(workingDirectory);
-            string[] siblingDirectories = Directory.GetDirectories(parentPath);
+            string[] siblingDirectories = Directory.GetDirectories("/Drop");
             Console.WriteLine("directories: ");
             foreach (string dir in siblingDirectories)
             {
                 Console.WriteLine(dir);
             }
 
-            string[] siblingFiles = Directory.GetFiles(parentPath);
+            string[] siblingFiles = Directory.GetFiles("/Drop");
             Console.WriteLine("files: ");
             foreach (string dir in siblingFiles)
             {
