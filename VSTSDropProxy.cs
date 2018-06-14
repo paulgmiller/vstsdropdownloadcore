@@ -179,18 +179,17 @@ namespace DropDownloadCore
       
         private string HashFiles(IEnumerable<VstsFile> files)
         {
-            var hasher = new System.Security.Cryptography.HMACMD5();
-            hasher.Initialize();
-            foreach( var f in files.OrderBy(f => f.Path))
+            StringBuilder builder = new StringBuilder();
+            foreach(var f in files.OrderBy(f => f.Path))
             {
-                var buffer = Encoding.UTF8.GetBytes(f.Blob.Id);
-                hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
-                buffer = Encoding.UTF8.GetBytes(f.Path);
-                hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
+                builder.Append(f.Blob.Id);
+                builder.Append(f.Path);
             }
-            hasher.TransformFinalBlock(new byte[0], 0, 0);
-            //can we make this shorter by not using hex? base64 has chars that don't work in docker tags
-            return System.BitConverter.ToString(hasher.Hash).Replace("-","");
+            var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+            var hasher = new System.Security.Cryptography.SHA1Managed();
+            var hash = hasher.ComputeHash(bytes);
+            //really we want to encode as base36
+            return System.BitConverter.ToString(hash).Replace("-","").ToLower();
         }
     }
 
