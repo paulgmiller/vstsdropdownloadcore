@@ -167,12 +167,12 @@ namespace DropDownloadCore
                 var f = group.First();
                 var relativepath = f.Path.Substring(_relativeroot.Length);
                 var localPath = Path.Combine(localDestiantion,relativepath).Replace("\\","/");
-                var sw = new Stopwatch();
+                var sw = Stopwatch.StartNew();
                 await Download(f.Blob.Url, localPath);
                 dltimes.Add(sw.Elapsed.TotalSeconds);
                  
 
-                sw = new Stopwatch();
+                sw = Stopwatch.StartNew();
                 // parallelize this too? worth it?
                 foreach (var other in group.Skip(1))
                 {
@@ -184,15 +184,13 @@ namespace DropDownloadCore
                 if (++downloaded % 100 == 0)
                 {
                     Console.WriteLine($"Downloaded {downloaded} files");
-                    //remveo later just want to see urls
-                    Console.WriteLine($"example url {f.Blob.Url}");
                 }                
             });
             await Task.WhenAll(downloads);
             metrics["AverageDownloadSecs"] = dltimes.Average();
             metrics["MaxDownloadSecs"] = dltimes.Max();
             metrics["AverageCopySecs"] = copytimes.Average();
-            metrics["MaxCopydSecs"] = copytimes.Max();
+            metrics["MaxCopySecs"] = copytimes.Max();
             return metrics;
         } 
       
