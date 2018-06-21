@@ -52,6 +52,7 @@ namespace DropDownloadCore
             {
                  metrics["Elapsed"] = sw.Elapsed.TotalSeconds;
                  telemetry.TrackEvent("dropdownloader", props, metrics);
+                 telemetry.Flush();
             }
         }
 
