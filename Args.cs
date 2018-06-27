@@ -25,6 +25,9 @@ namespace DropDownloadCore
         [Option]
         public string RelativePath { get; set; } = Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) 
                                                    ?? "/";
+        
+        [Option]
+        public int BlobTimeoutSeconds { get; set; } = int.Parse(Environment.GetEnvironmentVariable("BlobTimeoutSeconds") ?? "15");
 
         [Option]
         public string InstrumentationKey { get; set; } = "5af8641f-fe42-4661-b431-849b73b55e0c";

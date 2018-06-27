@@ -25,22 +25,25 @@ namespace DropDownloadCore
         private const string BlobAPIVersion = "2.1-preview";
 
         private readonly IDropApi _dropApi = null;
-        private readonly HttpClient _contentClient = new HttpClient();
+        private readonly HttpClient _contentClient;
 
         private readonly Uri _VSTSDropUri;
         private readonly string _relativeroot;
         
         private readonly ISet<VstsFile> _files;
         
-        public VSTSDropProxy(string VSTSDropUri, string path, string pat)
+        public VSTSDropProxy(string VSTSDropUri, string path, string pat, TimeSpan blobtimeout)
         {
             
             _dropApi = new RestfulDropApi(pat);
+            _contentClient = new HttpClient() { Timeout = blobtimeout };
               
             if (!Uri.TryCreate(VSTSDropUri, UriKind.Absolute, out _VSTSDropUri))
             {
                 throw new ArgumentException($"VSTS drop URI invalid {VSTSDropUri}", nameof(VSTSDropUri));
             }
+            
+            
             
             if (path == null)
             {
@@ -105,6 +108,7 @@ namespace DropDownloadCore
                     })
                 .ExecuteAsync(async () =>
                 {
+                    //if we would set the timeout based on the size of the blob which is in the manifest.
                     using (var blob = await _contentClient.GetStreamAsync(sasurl).ConfigureAwait(false))
                     using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
                     {
