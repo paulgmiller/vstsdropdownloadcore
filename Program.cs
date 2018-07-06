@@ -66,7 +66,6 @@ namespace DropDownloadCore
             string guidDirectory = string.Empty;
             string currDir = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             Console.WriteLine(currDir);
-            string[] childDirectories = Directory.GetDirectories(currDir);
 
             try
             {
