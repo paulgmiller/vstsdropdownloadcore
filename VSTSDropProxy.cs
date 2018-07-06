@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Configuration;
 using System.Diagnostics;
 using System.IO;
@@ -120,11 +121,13 @@ namespace DropDownloadCore
          // 4) parallelize copy with buffer first attempt at that with _contentClient.GetBufferAsync failed. Also lots of memory.
          // 5) multistream copyasync
          // Tried configureawait(false) and copyaync to each file (though not aparallelized) with no effect.
-        public async Task Materialize(string localDestiantion)
+        public async Task<Dictionary<string,double>> Materialize(string localDestiantion)
         {
             var uniqueblobs = _files.GroupBy(file => file.Blob.Id).ToList();
             Console.WriteLine($"Found {_files.Count} files, {uniqueblobs.Count} unique");
-            
+            var metrics = new Dictionary<string,double>();
+            metrics["files"] = _files.Count;
+            metrics["uniqueblobs"] = uniqueblobs.Count;
             var dockerdirs = new HashSet<string>();
             //precreate directories so we don't have to worry.
             //slow but we don't care cause we want to move off and have sangam use blobs directly
@@ -142,6 +145,8 @@ namespace DropDownloadCore
                 }
             }
 
+            metrics["dockerfiles"] = dockerdirs.Count;
+
             //Altenatively would be neat to hash as we iterate throgh first loop
             foreach (var ddir in dockerdirs)
             {
@@ -155,13 +160,19 @@ namespace DropDownloadCore
 
             
             int downloaded = 0;
+            var dltimes = new ConcurrentBag<Double>();
+            var copytimes = new ConcurrentBag<Double>();
             var downloads = uniqueblobs.Select(async group => 
             {
                 var f = group.First();
                 var relativepath = f.Path.Substring(_relativeroot.Length);
                 var localPath = Path.Combine(localDestiantion,relativepath).Replace("\\","/");
+                var sw = Stopwatch.StartNew();
                 await Download(f.Blob.Url, localPath);
+                dltimes.Add(sw.Elapsed.TotalSeconds);
                  
+
+                sw = Stopwatch.StartNew();
                 // parallelize this too? worth it?
                 foreach (var other in group.Skip(1))
                 {
@@ -169,28 +180,33 @@ namespace DropDownloadCore
                     var otherpath = Path.Combine(localDestiantion,otherrelativepath).Replace("\\","/");
                     File.Copy(localPath, otherpath);
                 }
+                copytimes.Add(sw.Elapsed.TotalSeconds);
                 if (++downloaded % 100 == 0)
                 {
                     Console.WriteLine($"Downloaded {downloaded} files");
                 }                
             });
             await Task.WhenAll(downloads);
+            metrics["AverageDownloadSecs"] = dltimes.Average();
+            metrics["MaxDownloadSecs"] = dltimes.Max();
+            metrics["AverageCopySecs"] = copytimes.Average();
+            metrics["MaxCopySecs"] = copytimes.Max();
+            return metrics;
         } 
       
         private string HashFiles(IEnumerable<VstsFile> files)
         {
-            var hasher = new System.Security.Cryptography.HMACMD5();
-            hasher.Initialize();
-            foreach( var f in files.OrderBy(f => f.Path))
+            StringBuilder builder = new StringBuilder();
+            foreach(var f in files.OrderBy(f => f.Path))
             {
-                var buffer = Encoding.UTF8.GetBytes(f.Blob.Id);
-                hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
-                buffer = Encoding.UTF8.GetBytes(f.Path);
-                hasher.TransformBlock(buffer, 0, buffer.Length, null, 0);
+                builder.Append(f.Blob.Id);
+                builder.Append(f.Path);
             }
-            hasher.TransformFinalBlock(new byte[0], 0, 0);
-            //can we make this shorter by not using hex? base64 has chars that don't work in docker tags
-            return System.BitConverter.ToString(hasher.Hash).Replace("-","");
+            var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+            var hasher = new System.Security.Cryptography.SHA1Managed();
+            var hash = hasher.ComputeHash(bytes);
+            //really we want to encode as base36
+            return System.BitConverter.ToString(hash).Replace("-","").ToLower();
         }
     }
 

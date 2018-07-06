@@ -26,6 +26,9 @@ namespace DropDownloadCore
         public string RelativePath { get; set; } = Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) 
                                                    ?? "/";
 
+        [Option]
+        public string InstrumentationKey { get; set; } = "5af8641f-fe42-4661-b431-849b73b55e0c";
+
         public Args()
         {
         }
