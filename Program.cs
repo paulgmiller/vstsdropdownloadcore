@@ -27,7 +27,7 @@ namespace DropDownloadCore
             var sw = Stopwatch.StartNew();
             try
             {
-                a.ValidatePat();
+                a.Validate();
                 var url = a.DropUrl ?? ExtractDropUrl(a.DropDestination);
                 props["url"] = url;
                 // sample URL:
@@ -36,7 +36,7 @@ namespace DropDownloadCore
                 // /Release/Amd64/app/aether/AetherBackend
                 Console.WriteLine($"relative path: {a.RelativePath}");
                 Console.WriteLine($"destination: {a.DropDestination}");
-                var proxy = new VSTSDropProxy(url, a.RelativePath, a.VstsPat);
+                var proxy = new VSTSDropProxy(url, a.RelativePath, a.VstsPat, TimeSpan.FromSeconds(a.BlobTimeoutSeconds));
                 metrics = proxy.Materialize(a.DropDestination).Result;
                 Console.WriteLine($"Finished in {sw.Elapsed}");
                 props["success"] = "True";

@@ -25,6 +25,9 @@ namespace DropDownloadCore
         [Option]
         public string RelativePath { get; set; } = Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) 
                                                    ?? "/";
+        
+        [Option]
+        public int BlobTimeoutSeconds { get; set; } = int.Parse(Environment.GetEnvironmentVariable("BlobTimeoutSeconds") ?? "15");
 
         [Option]
         public string InstrumentationKey { get; set; } = "5af8641f-fe42-4661-b431-849b73b55e0c";
@@ -33,11 +36,16 @@ namespace DropDownloadCore
         {
         }
 
-        public void ValidatePat()
+        public void Validate()
         {
             if (string.IsNullOrWhiteSpace(this.VstsPat) || this.VstsPat.Equals("$(System.AccessToken)"))
             {
                 throw new ArgumentException("Invalid personal accestoken. Remember to set allow scripts to access oauth token in agent phase");
+            }
+            
+            if (this.BlobTimeoutSeconds < 0 || this.BlobTimeoutSeconds > 3600) 
+            {
+                throw new ArgumentException("blob timeout needs to be postive and less than an hour");
             }
         }
     }
