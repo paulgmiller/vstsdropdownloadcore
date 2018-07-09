@@ -27,7 +27,7 @@ namespace DropDownloadCore
             var sw = Stopwatch.StartNew();
             try
             {
-                a.ValidatePat();
+                a.Validate();
                 var url = a.DropUrl ?? ExtractDropUrl(a.DropDestination);
                 props["url"] = url;
                 // sample URL:

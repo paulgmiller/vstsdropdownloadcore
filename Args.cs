@@ -36,11 +36,16 @@ namespace DropDownloadCore
         {
         }
 
-        public void ValidatePat()
+        public void Validate()
         {
             if (string.IsNullOrWhiteSpace(this.VstsPat) || this.VstsPat.Equals("$(System.AccessToken)"))
             {
                 throw new ArgumentException("Invalid personal accestoken. Remember to set allow scripts to access oauth token in agent phase");
+            }
+            
+            if (this.BlobTimeoutSeconds < 0 || this.BlobTimeoutSeconds > 3600) 
+            {
+                throw new ArgumentException("blob timeout needs to be postive and less than an hour");
             }
         }
     }
