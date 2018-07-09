@@ -57,46 +57,20 @@ namespace DropDownloadCore
             }
         }
 
-        private static bool IsVSTSBuild()
-        {
-            Console.WriteLine($"system host type: {Environment.GetEnvironmentVariable("SYSTEM_HOSTTYPE")}");
-            return Environment.GetEnvironmentVariable("SYSTEM_HOSTTYPE") == "build";
-        }
-
-        private static string GetBuildFolder(string workingDirectory)
-        {
-            if (IsVSTSBuild())
-            {
-                return workingDirectory;
-            }
-
-            try
-            {
-                return Directory.GetDirectories(workingDirectory).Single();
-            }
-            catch (Exception)
-            {
-                Console.WriteLine($"The working directory, {workingDirectory}, is invalid");
-                throw;
-            }
-        }
-
         // agent based tasks automatically download artifacts from the build. 
         // when the build only produces a vsts drop that artifact is a single json
         // it resides in <builddefname>/<guid>/VSTSDrop.json
         private static string ExtractDropUrl(string workingDirectory)
         {
-            string buildDirectory = GetBuildFolder(workingDirectory);
             string guidDirectory = string.Empty;
 
             try
             {
-                // guidDirectory = Directory.GetDirectories(buildDirectory).Single();
-                guidDirectory = Directory.GetDirectories(buildDirectory).Where(directory => directory.Remove(0,directory.LastIndexOf('/') + 1) != "drop").Single();
+                guidDirectory = Directory.GetDirectories(workingDirectory).Single();
             }
             catch (Exception)
             {
-                Console.WriteLine($"The build directory, {buildDirectory}, is invalid");
+                Console.WriteLine($"The build directory, {workingDirectory}, is invalid");
                 throw;
             }
 
