@@ -11,18 +11,18 @@ namespace DropDownloadCore
         private const string DefaultDropDestination = "/drop";
         private const string DropUrlEnvironmentVariable = "dropurl";
 
-        [Option]
+        [Option('t', "VstsPat")]
         public string VstsPat { get; set; } = Environment.GetEnvironmentVariable(VSTSPatEnvironmentVariable);
 
-        [Option]
+        [Option('d', "DropDestination")]
         public string DropDestination { get; set; } =
             System.Environment.GetEnvironmentVariable(DropDestinationEnvironmentVariable)
             ?? DefaultDropDestination;
 
-        [Option]
+        [Option('u', "DropUrl")]
         public string DropUrl { get; set; } = Environment.GetEnvironmentVariable(DropUrlEnvironmentVariable);
 
-        [Option]
+        [Option('p', "RelativePath")]
         public string RelativePath { get; set; } = Environment.GetEnvironmentVariable(RelavePathEnvironmentVariable) 
                                                    ?? "/";
         
