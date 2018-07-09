@@ -108,7 +108,7 @@ namespace DropDownloadCore
                     })
                 .ExecuteAsync(async () =>
                 {
-                    //if we would set the timeout based on the size of the blob which is in the manifest.
+                    //TODO: Would be better to  set the timeout based on the size of the blob which is in the manifest
                     using (var blob = await _contentClient.GetStreamAsync(sasurl).ConfigureAwait(false))
                     using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
                     {
