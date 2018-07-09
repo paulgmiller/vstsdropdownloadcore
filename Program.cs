@@ -59,6 +59,7 @@ namespace DropDownloadCore
 
         private static bool IsVSTSBuild()
         {
+            Console.WriteLine($"system host type: {Environment.GetEnvironmentVariable("SYSTEM_HOSTTYPE")}");
             return Environment.GetEnvironmentVariable("SYSTEM_HOSTTYPE") == "build";
         }
 
