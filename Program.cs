@@ -92,7 +92,7 @@ namespace DropDownloadCore
             try
             {
                 // guidDirectory = Directory.GetDirectories(buildDirectory).Single();
-                guidDirectory = Directory.GetDirectories(buildDirectory).Where(directory => directory != "drop").Single();
+                guidDirectory = Directory.GetDirectories(buildDirectory).Where(directory => directory.Remove(0,directory.LastIndexOf('/') + 1) != "drop").Single();
             }
             catch (Exception)
             {
