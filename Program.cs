@@ -64,28 +64,27 @@ namespace DropDownloadCore
             //could take an envdir on what the build dir is for now though we just have one build
             string buildDirectory = string.Empty;
             string guidDirectory = string.Empty;
-
+            
+            string dropJSONFilename;
             try
             {
-                buildDirectory = Directory.GetDirectories(workingDirectory).Single();
+                var dropjsonfiles = Directory.GetFiles(workingDirectory, "VSTSDrop.json", SearchOption.AllDirectories);
+                if (dropjsonfiles.Length == 0)
+                {
+                    throw new ArgumentException("Didn't find any vstsdrop.json");
+                }
+                if (dropjsonfiles.Length > 1)
+                {
+                    var allpaths = string.Join(";",dropjsonfiles);
+                    throw new ArgumentException("Found multiple vstsdrop.json: {allpaths}");
+                }
+                dropJSONFilename = dropjsonfiles.Single();
             }
             catch (Exception)
             {
-                Console.WriteLine($"The working directory, {workingDirectory}, is invalid");
+                Console.WriteLine($"Trouble finding VSTSDrop.json in {workingDirectory}");
                 throw;
             }
-
-            try
-            {
-                guidDirectory = Directory.GetDirectories(buildDirectory).Single();
-            }
-            catch (Exception)
-            {
-                Console.WriteLine($"The build directory, {buildDirectory}, is invalid");
-                throw;
-            }
-
-            var dropJSONFilename = Path.Combine(workingDirectory, buildDirectory,  guidDirectory, "VSTSDrop.json");
 
             // https://www.newtonsoft.com/json/help/html/DeserializeAnonymousType.htm
             var definition = new { VstsDropBuildArtifact = new {VstsDropUrl ="" } };
