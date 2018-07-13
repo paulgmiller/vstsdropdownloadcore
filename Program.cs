@@ -61,7 +61,7 @@ namespace DropDownloadCore
         {
             try 
             {
-                string[] vstsDrops = Directory.GetFiles(workingDirectory, "*/VSTSDrop.json", SearchOption.AllDirectories);
+                string[] vstsDrops = Directory.GetFiles(workingDirectory, "VSTSDrop.json", SearchOption.AllDirectories);
                 return vstsDrops.Single();
             }
             catch(Exception e)
