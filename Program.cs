@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
+using System.Reflection;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using CommandLine;
@@ -56,36 +57,27 @@ namespace DropDownloadCore
             }
         }
 
+        private static string findDropJson(string workingDirectory)
+        {
+            try 
+            {
+                string[] vstsDrops = Directory.GetFiles(workingDirectory, "VSTSDrop.json", SearchOption.AllDirectories);
+                return vstsDrops.Single();
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine($"The working directory, {workingDirectory}, is invalid");
+                Console.WriteLine(e.Message);
+                throw;
+            }
+        }
+
         // agent based tasks automatically download artifacts from the build. 
         // when the build only produces a vsts drop that artifact is a single json
         // it resides in <builddefname>/<guid>/VSTSDrop.json
         private static string ExtractDropUrl(string workingDirectory)
         {
-            //could take an envdir on what the build dir is for now though we just have one build
-            string buildDirectory = string.Empty;
-            string guidDirectory = string.Empty;
-
-            try
-            {
-                buildDirectory = Directory.GetDirectories(workingDirectory).Single();
-            }
-            catch (Exception)
-            {
-                Console.WriteLine($"The working directory, {workingDirectory}, is invalid");
-                throw;
-            }
-
-            try
-            {
-                guidDirectory = Directory.GetDirectories(buildDirectory).Single();
-            }
-            catch (Exception)
-            {
-                Console.WriteLine($"The build directory, {buildDirectory}, is invalid");
-                throw;
-            }
-
-            var dropJSONFilename = Path.Combine(workingDirectory, buildDirectory,  guidDirectory, "VSTSDrop.json");
+            var dropJSONFilename = findDropJson(workingDirectory);
 
             // https://www.newtonsoft.com/json/help/html/DeserializeAnonymousType.htm
             var definition = new { VstsDropBuildArtifact = new {VstsDropUrl ="" } };
