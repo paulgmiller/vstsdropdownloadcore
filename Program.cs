@@ -57,24 +57,27 @@ namespace DropDownloadCore
             }
         }
 
+        private static string findDropJson(string workingDirectory)
+        {
+            try 
+            {
+                string[] vstsDrops = Directory.GetFiles(workingDirectory, "*/VSTSDrop.json", SearchOption.AllDirectories);
+                return vstsDrops.Single();
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine($"The working directory, {workingDirectory}, is invalid");
+                Console.WriteLine(e.Message);
+                throw;
+            }
+        }
+
         // agent based tasks automatically download artifacts from the build. 
         // when the build only produces a vsts drop that artifact is a single json
         // it resides in <builddefname>/<guid>/VSTSDrop.json
         private static string ExtractDropUrl(string workingDirectory)
         {
-            string guidDirectory = string.Empty;
-
-            try
-            {
-                guidDirectory = Directory.GetDirectories(workingDirectory).Single();
-            }
-            catch (Exception)
-            {
-                Console.WriteLine($"The build directory, {workingDirectory}, is invalid");
-                throw;
-            }
-
-            var dropJSONFilename = Path.Combine(workingDirectory,  guidDirectory, "VSTSDrop.json");
+            var dropJSONFilename = findDropJson(workingDirectory);
 
             // https://www.newtonsoft.com/json/help/html/DeserializeAnonymousType.htm
             var definition = new { VstsDropBuildArtifact = new {VstsDropUrl ="" } };
