@@ -12,13 +12,16 @@ namespace DropDownloadCore
 {
     sealed class Program
     {
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
+            int retCode = 0;
             var result = CommandLine.Parser.Default.ParseArguments<Args>(args)
-                 .WithParsed<Args>(a => Run(a));
+                 .WithParsed<Args>(a => retCode = Run(a));
+
+            return retCode;
         }
 
-        static void Run(Args a)
+        static int Run(Args a)
         {
             var telemetry = new TelemetryClient(new TelemetryConfiguration(a.InstrumentationKey));
             //https://docs.microsoft.com/en-us/dotnet/api/microsoft.applicationinsights.telemetryclient.trackevent?view=azure-dotnet
@@ -36,17 +39,18 @@ namespace DropDownloadCore
                 // /Release/Amd64/app/aether/AetherBackend
                 Console.WriteLine($"relative path: {a.RelativePath}");
                 Console.WriteLine($"destination: {a.DropDestination}");
-                var proxy = new VSTSDropProxy(url, a.RelativePath, a.VstsPat, TimeSpan.FromSeconds(a.BlobTimeoutSeconds));
+                var proxy = new VSTSDropProxy(url, a.RelativePath, a.VstsPat, TimeSpan.FromSeconds(a.BlobTimeoutSeconds), a.RetryCount, a.SoftLinks, a.CacheLocation, a.ConcurrentDownloads, a.ComputeDockerHashes);
                 metrics = proxy.Materialize(a.DropDestination).Result;
                 Console.WriteLine($"Finished in {sw.Elapsed}");
                 props["success"] = "True";
-                
+                return 0;
             } 
             catch (Exception e)
             {
                 props["success"]  = "False";
                 props["exception"] = e.ToString();
-                throw;
+                Console.WriteLine($"Unhandled exception: {e.ToString()}");
+                return 1;
             }
             finally
             {
@@ -89,7 +93,7 @@ namespace DropDownloadCore
             // https://www.newtonsoft.com/json/help/html/DeserializeAnonymousType.htm
             var definition = new { VstsDropBuildArtifact = new {VstsDropUrl ="" } };
             var artifact = JsonConvert.DeserializeAnonymousType(File.ReadAllText(dropJSONFilename), definition);
-            return artifact.VstsDropBuildArtifact.VstsDropUrl;            
+            return artifact.VstsDropBuildArtifact.VstsDropUrl;
         }
     }
 }
