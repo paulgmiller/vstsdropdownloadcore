@@ -40,14 +40,10 @@ namespace DropDownloadCore
         /// <param name="blobAPIVersion">The API version to use for the blob API.</param>
         /// <param name="relativeRoot">The root path relative to the drop to retrieve.</param>
         /// <returns>The manifest details.</returns>         
-        public async Task<ISet<VstsFile>> GetVstsManifest(Uri manifestUri, string blobAPIVersion, 
+        public async Task<IList<VstsFile>> GetVstsManifest(Uri manifestUri, string blobAPIVersion, 
                                                                  string relativeRoot)
         {
-            // dotnet core doesn't currently handle vsts redirects well. Poking both teams about it
-            // for now disable redirects.
-
-            var clientHandler = new HttpClientHandler() { AllowAutoRedirect = false };
-            using (var client = new HttpClient(clientHandler))
+            using (var client = new HttpClient())
             {
                 var base64EncodedString = Convert.ToBase64String(Encoding.UTF8.GetBytes("vstsdockerbuild:" + _pat));
                 
@@ -63,15 +59,14 @@ namespace DropDownloadCore
                 {
                      manifestResponse = await client.GetAsync(manifestResponse.Headers.Location);
                 }
+
                 manifestResponse.EnsureSuccessStatusCode();
                 string manifestContent = await manifestResponse.Content.ReadAsStringAsync();
-                     
                 //filter here so we can be case insensitve. manifest url would take a directory but unlike root in drop.exe it is case sensitve.
                 //derserialize from stream in future to not buffer as much?
                 var manifest = JsonConvert.DeserializeObject<List<VstsFile>>(manifestContent)
                                     .Where(f => f.Path.StartsWith(relativeRoot, StringComparison.OrdinalIgnoreCase)).ToList();
-                
-                
+
                 // forget what our limit was but this would be bad for a whole drop. Batch has a certain
                 // limit. Should we batch to 500 or lazily get sas urls for only certain directories
                 // (those with dockerfiles in them)
@@ -101,7 +96,7 @@ namespace DropDownloadCore
                 {
                     file.Blob.Url = urlDictionary[file.Blob.Id];
                 }
-                return new HashSet<VstsFile>(manifest);
+                return manifest;
             }
         }   
 
@@ -112,7 +107,6 @@ namespace DropDownloadCore
             /// </summary>
             
             public IEnumerable<VstsBlob> Blobs { get; set; }
-            
         }
     }
 }

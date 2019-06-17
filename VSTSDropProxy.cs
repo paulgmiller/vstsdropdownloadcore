@@ -1,66 +1,77 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Security.Cryptography;
 using System.Web;
 
 using Polly;
+using System.Net.Sockets;
+using System.Threading.Tasks.Dataflow;
+using System.Threading;
+using System.Runtime.InteropServices;
 
 namespace DropDownloadCore
 {
     //use vsts drop rest api for manifest and blob and a PAT to grab urls to files and hackily materialize them.
-    public class VSTSDropProxy 
+    public class VSTSDropProxy
     {
         // sigh these went public moths ago. Check if we can use non preview versions
         private const string ManifestAPIVersion = "2.0-preview";
         private const string BlobAPIVersion = "2.1-preview";
-
+        private int processedFileCount = 0;
         private readonly IDropApi _dropApi = null;
         private readonly HttpClient _contentClient;
-
+        private readonly int _retryCount;
+        private readonly bool _useSoftLinks;
+        private readonly string _cacheLocation;
+        private readonly int _concurrentDownloads;
+        private readonly bool _computeDockerHashes;
         private readonly Uri _VSTSDropUri;
         private readonly string _relativeroot;
-        
-        private readonly ISet<VstsFile> _files;
-        
-        public VSTSDropProxy(string VSTSDropUri, string path, string pat, TimeSpan blobtimeout)
+
+        private readonly IList<VstsFile> _files;
+
+        public VSTSDropProxy(string VSTSDropUri, string path, string pat, TimeSpan blobtimeout, int retryCount, bool useSoftLinks, string cacheLocation, int concurrentDownloads, bool computeDockerHashes)
         {
-            
             _dropApi = new RestfulDropApi(pat);
             _contentClient = new HttpClient() { Timeout = blobtimeout };
-              
+            _retryCount = retryCount;
+            _useSoftLinks = useSoftLinks;
+            _cacheLocation = cacheLocation;
+            _concurrentDownloads = concurrentDownloads;
+            _computeDockerHashes = computeDockerHashes;
+
             if (!Uri.TryCreate(VSTSDropUri, UriKind.Absolute, out _VSTSDropUri))
             {
                 throw new ArgumentException($"VSTS drop URI invalid {VSTSDropUri}", nameof(VSTSDropUri));
             }
-            
-            
-            
+
             if (path == null)
             {
                 throw new ArgumentException($"VSTS drop URI must contain a ?root= querystring {_VSTSDropUri}", nameof(VSTSDropUri));
             }
-            
-            _relativeroot = path.Replace("\\", "/");
+
+            _relativeroot = path.Replace('\\', Path.DirectorySeparatorChar);
             if (!_relativeroot.StartsWith("/"))
-                _relativeroot = "/" + _relativeroot;
+            {
+                _relativeroot = $"/{_relativeroot}";
+            }
+
             if (!_relativeroot.EndsWith("/"))
-                _relativeroot = _relativeroot + "/";
+            {
+                _relativeroot += "/";
+            }
 
             //move this to a lazy so we can actually be async?
             try
             {
                 var manifesturi = Munge(_VSTSDropUri, ManifestAPIVersion);
-                _files = _dropApi.GetVstsManifest(manifesturi, BlobAPIVersion, _relativeroot ).Result;
+                _files = _dropApi.GetVstsManifest(manifesturi, BlobAPIVersion, _relativeroot).Result;
             }
             catch (Exception)
             {
@@ -68,8 +79,8 @@ namespace DropDownloadCore
                 throw;
             }
 
-           if (!_files.Any())
-           {
+            if (!_files.Any())
+            {
                 throw new ArgumentException("Encountered empty build drop check your build " + VSTSDropUri);
             }
             //https://1eswiki.com/wiki/CloudBuild_Duplicate_Binplace_Detection
@@ -83,13 +94,11 @@ namespace DropDownloadCore
         /// <returns>The manifest uri.</returns>
         private static Uri Munge(Uri vstsDropUri, string apiVersion)
         {
-            var querystring = HttpUtility.ParseQueryString(vstsDropUri.Query);
             string manifestpath = vstsDropUri.AbsolutePath.Replace("_apis/drop/drops", "_apis/drop/manifests");
             var uriBuilder = new UriBuilder(vstsDropUri.Scheme, vstsDropUri.Host, -1, manifestpath);
             var queryParameters = HttpUtility.ParseQueryString(uriBuilder.Query);
-            queryParameters.Add(RestfulDropApi.APIVersionParam,apiVersion);
+            queryParameters.Add(RestfulDropApi.APIVersionParam, apiVersion);
             uriBuilder.Query = queryParameters.ToString();
-            
             return uriBuilder.Uri;
         }
 
@@ -97,50 +106,84 @@ namespace DropDownloadCore
         {
             await Policy
                 .Handle<HttpRequestException>()
+                .Or<SocketException>()
                 .Or<IOException>()
                 .Or<TaskCanceledException>()
-                .WaitAndRetryAsync(5, 
+                .WaitAndRetryAsync(_retryCount,
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    (e,t) => 
+                    (e, t) =>
                     {
                         Console.WriteLine($"Exception {e} on {sasurl} -> {localpath}");
-                        File.Delete(localpath);
+                        if (File.Exists(localpath))
+                        {
+                            File.Delete(localpath);
+                        }
                     })
                 .ExecuteAsync(async () =>
                 {
-                    //TODO: Would be better to  set the timeout based on the size of the blob which is in the manifest
-                    using (var blob = await _contentClient.GetStreamAsync(sasurl).ConfigureAwait(false))
+                    // todo: timeout based on blob size
+                    using (var blob = await _contentClient.GetStreamAsync(sasurl))
                     using (var fileStream = new FileStream(localpath, FileMode.CreateNew))
                     {
-                        await blob.CopyToAsync(fileStream).ConfigureAwait(false);
+                        await blob.CopyToAsync(fileStream);
                     }
                 });
         }
-        
-         //So this only dedupes within a build.
-         //other options for perf.
-         // 1) only grab certain directories either with dockerfiles or as specified by build.yaml
-         // 2) Prioritize large files or files with lots of copies.
-         // 3) linux symlink instead of copy
-         // 4) parallelize copy with buffer first attempt at that with _contentClient.GetBufferAsync failed. Also lots of memory.
-         // 5) multistream copyasync
-         // Tried configureawait(false) and copyaync to each file (though not aparallelized) with no effect.
-        public async Task<Dictionary<string,double>> Materialize(string localDestiantion)
+
+        // other options for perf.
+        // 1) only grab certain directories either with dockerfiles or as specified by build.yaml
+        // 2) Prioritize large files or files with lots of copies.
+        // 3) parallelize copy with buffer first attempt at that with _contentClient.GetBufferAsync failed. Also lots of memory.
+        // 4) multistream copyasync
+        public async Task<Dictionary<string, double>> Materialize(string localDestination)
         {
-            var uniqueblobs = _files.GroupBy(file => file.Blob.Id).ToList();
+            var uniqueblobs = _files.GroupBy(keySelector: file => file.Blob.Id, resultSelector: (key, file) => file).ToList();
             Console.WriteLine($"Found {_files.Count} files, {uniqueblobs.Count} unique");
-            var metrics = new Dictionary<string,double>();
-            metrics["files"] = _files.Count;
-            metrics["uniqueblobs"] = uniqueblobs.Count;
-            var dockerdirs = new HashSet<string>();
-            //precreate directories so we don't have to worry.
-            //slow but we don't care cause we want to move off and have sangam use blobs directly
+            var metrics = new Dictionary<string, double>
+            {
+                ["files"] = _files.Count,
+                ["uniqueblobs"] = uniqueblobs.Count
+            };
+
+            if (_computeDockerHashes)
+            {
+                ComputeDockerHashes(localDestination, metrics);
+            }
+
+            var dltimes = new ConcurrentBag<double>();
+            var copytimes = new ConcurrentBag<double>();
+            var throttler = new ActionBlock<IEnumerable<VstsFile>>(list => DownloadGrouping(list, localDestination, dltimes, copytimes), new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = _concurrentDownloads });
+
+            foreach (var grouping in uniqueblobs)
+            {
+                throttler.Post(grouping);
+            }
+
+            throttler.Complete();
+            await throttler.Completion;
+
+            if (dltimes.Any())
+            {
+                metrics["AverageDownloadSecs"] = dltimes.Average();
+                metrics["MaxDownloadSecs"] = dltimes.Max();
+            }
+
+            if (copytimes.Any())
+            {
+                metrics["AverageCopySecs"] = copytimes.Average();
+                metrics["MaxCopySecs"] = copytimes.Max();
+            }
+
+            return metrics;
+        }
+
+        private void ComputeDockerHashes(string localDestination, IDictionary<string, double> metrics)
+        {
+            var dockerdirs = new List<string>();
             foreach (var file in _files) //could do blobs.selectmany(vallues)
             {
                 var replativepath = file.Path.Substring(_relativeroot.Length);
-                var localpath = Path.Combine(localDestiantion,replativepath).Replace("\\","/");
-                //also not efficient to check directory each time 
-                
+                var localpath = Path.Combine(localDestination, replativepath).Replace('\\', Path.DirectorySeparatorChar);
                 Directory.CreateDirectory(Path.GetDirectoryName(localpath));
                 var filename = Path.GetFileName(localpath);
                 if (filename.StartsWith("dockerfile", StringComparison.OrdinalIgnoreCase))
@@ -158,50 +201,80 @@ namespace DropDownloadCore
                 var hash = HashFiles(dirfiles);
                 Console.WriteLine($"{ddir} ({dirfiles.Count})-> {hash}");
                 var relativepath = ddir.Substring(_relativeroot.Length);
-                var localPath = Path.Combine(localDestiantion,relativepath);
-                await File.WriteAllTextAsync(Path.Combine(localPath, ".dirhash"), hash);
+                var localPath = Path.Combine(localDestination, relativepath).Replace('\\', Path.DirectorySeparatorChar);
+                File.WriteAllText(Path.Combine(localPath, ".dirhash"), hash);
+            }
+        }
+
+        private async Task DownloadGrouping(IEnumerable<VstsFile> group, string localDestination, ConcurrentBag<double> dltimes, ConcurrentBag<double> copytimes)
+        {
+            var blob = group.First().Blob;
+            var blobPath = Path.Combine(localDestination, _cacheLocation, blob.Id).Replace('\\', Path.DirectorySeparatorChar);
+            if (!File.Exists(blobPath))
+            {
+                var downloadTimer = Stopwatch.StartNew();
+                EnsureDirectory(blobPath);
+                await Download(blob.Url, blobPath);
+                downloadTimer.Stop();
+                dltimes.Add(downloadTimer.Elapsed.TotalSeconds);
             }
 
-            
-            int downloaded = 0;
-            var dltimes = new ConcurrentBag<Double>();
-            var copytimes = new ConcurrentBag<Double>();
-            var downloads = uniqueblobs.Select(async group => 
+            var copyTimer = Stopwatch.StartNew();
+            foreach (var other in group)
             {
-                var f = group.First();
-                var relativepath = f.Path.Substring(_relativeroot.Length);
-                var localPath = Path.Combine(localDestiantion,relativepath).Replace("\\","/");
-                var sw = Stopwatch.StartNew();
-                await Download(f.Blob.Url, localPath);
-                dltimes.Add(sw.Elapsed.TotalSeconds);
-                 
-
-                sw = Stopwatch.StartNew();
-                // parallelize this too? worth it?
-                foreach (var other in group.Skip(1))
+                var otherrelativepath = other.Path.Substring(_relativeroot.Length);
+                var otherpath = Path.Combine(localDestination, otherrelativepath).Replace('\\', Path.DirectorySeparatorChar);
+                EnsureDirectory(otherpath);
+                File.Delete(otherpath);
+                CreateLink(blobPath, otherpath, softLink: _useSoftLinks);
+                var count = Interlocked.Increment(ref this.processedFileCount);
+                if (count % 1000 == 0)
                 {
-                    var otherrelativepath = other.Path.Substring(_relativeroot.Length);
-                    var otherpath = Path.Combine(localDestiantion,otherrelativepath).Replace("\\","/");
-                    File.Copy(localPath, otherpath);
+                    Console.WriteLine($"Processed {count} files...");
                 }
-                copytimes.Add(sw.Elapsed.TotalSeconds);
-                if (++downloaded % 100 == 0)
+            }
+
+            copytimes.Add(copyTimer.Elapsed.TotalSeconds);
+        }
+
+        private void CreateLink(string localPath, string otherpath, bool softLink)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                using (var process = new Process()
                 {
-                    Console.WriteLine($"Downloaded {downloaded} files");
-                }                
-            });
-            await Task.WhenAll(downloads);
-            metrics["AverageDownloadSecs"] = dltimes.Average();
-            metrics["MaxDownloadSecs"] = dltimes.Max();
-            metrics["AverageCopySecs"] = copytimes.Average();
-            metrics["MaxCopySecs"] = copytimes.Max();
-            return metrics;
-        } 
-      
+                    StartInfo = new ProcessStartInfo()
+                    {
+                        FileName = "/bin/ln",
+                    },
+                })
+                {
+                    if (softLink)
+                    {
+                        process.StartInfo.ArgumentList.Add("-s");
+                    }
+
+                    process.StartInfo.ArgumentList.Add(localPath);
+                    process.StartInfo.ArgumentList.Add(otherpath);
+                    process.Start();
+                }
+            }
+            else
+            {
+                File.Copy(localPath, otherpath);
+            }
+
+        }
+
+        private void EnsureDirectory(string path)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+        }
+
         private string HashFiles(IEnumerable<VstsFile> files)
         {
             StringBuilder builder = new StringBuilder();
-            foreach(var f in files.OrderBy(f => f.Path))
+            foreach (var f in files.OrderBy(f => f.Path))
             {
                 builder.Append(f.Blob.Id);
                 builder.Append(f.Path);
@@ -210,7 +283,7 @@ namespace DropDownloadCore
             var hasher = new System.Security.Cryptography.SHA1Managed();
             var hash = hasher.ComputeHash(bytes);
             //really we want to encode as base36
-            return System.BitConverter.ToString(hash).Replace("-","").ToLower();
+            return System.BitConverter.ToString(hash).Replace("-", "").ToLower();
         }
     }
 
@@ -218,6 +291,7 @@ namespace DropDownloadCore
     public sealed class VstsFile
     {
         public string Path { get; set; }
+
         public VstsBlob Blob { get; set; }
 
         public override int GetHashCode() { return StringComparer.OrdinalIgnoreCase.GetHashCode(Path); }
@@ -226,7 +300,7 @@ namespace DropDownloadCore
     public sealed class VstsBlob
     {
         public string Url;
-        public string Id;
 
+        public string Id;
     }
 }
