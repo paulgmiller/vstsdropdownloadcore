@@ -140,7 +140,6 @@ namespace DropDownloadCore
                 var replativepath = file.Path.Substring(_relativeroot.Length);
                 var localpath = Path.Combine(localDestiantion,replativepath).Replace("\\","/");
                 //also not efficient to check directory each time 
-                
                 Directory.CreateDirectory(Path.GetDirectoryName(localpath));
                 var filename = Path.GetFileName(localpath);
                 if (filename.StartsWith("dockerfile", StringComparison.OrdinalIgnoreCase))
@@ -174,10 +173,21 @@ namespace DropDownloadCore
                 var sw = Stopwatch.StartNew();
                 await Download(f.Blob.Url, localPath);
                 dltimes.Add(sw.Elapsed.TotalSeconds);
-                 
+                if (++downloaded % 100 == 0)
+                {
+                    Console.WriteLine($"Downloaded {downloaded} files");
+                }    
+            });
+            await Task.WhenAll(downloads);
 
-                sw = Stopwatch.StartNew();
+            int copied = 0;
+            foreach (var group in uniqueblobs)
+            {
+                var sw = Stopwatch.StartNew();
                 // parallelize this too? worth it?
+                var relativepath = group.First().Path.Substring(_relativeroot.Length);
+                var localPath = Path.Combine(localDestiantion,relativepath).Replace("\\","/");
+                
                 foreach (var other in group.Skip(1))
                 {
                     var otherrelativepath = other.Path.Substring(_relativeroot.Length);
@@ -185,12 +195,12 @@ namespace DropDownloadCore
                     File.Copy(localPath, otherpath);
                 }
                 copytimes.Add(sw.Elapsed.TotalSeconds);
-                if (++downloaded % 100 == 0)
+                if (++copied % 100 == 0)
                 {
-                    Console.WriteLine($"Downloaded {downloaded} files");
+                    Console.WriteLine($"copied {copied} files");
                 }                
-            });
-            await Task.WhenAll(downloads);
+            }
+            
             metrics["AverageDownloadSecs"] = dltimes.Average();
             metrics["MaxDownloadSecs"] = dltimes.Max();
             metrics["AverageCopySecs"] = copytimes.Average();
