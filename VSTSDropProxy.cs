@@ -144,7 +144,8 @@ namespace DropDownloadCore
                 var filename = Path.GetFileName(localpath);
                 if (filename.StartsWith("dockerfile", StringComparison.OrdinalIgnoreCase))
                 {
-                    dockerdirs.Add(Path.GetDirectoryName(file.Path));
+                    var dockerdir = Path.GetDirectoryName(file.Path).Replace("\\", "/") + "/";
+                    dockerdirs.Add(dockerdir);
                 }
             }
 
